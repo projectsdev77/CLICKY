@@ -66,12 +66,12 @@ Priority: **P0** = MVP, **P1** = v1 shortly after MVP, **P2** = later.
 
 | ID | Requirement | Pri |
 |---|---|---|
-| AS-1 | Floating launcher button plus keyboard shortcut (default `⌘/Ctrl + K`, configurable) opens a chat panel. | P0 |
+| AS-1 | Floating launcher button plus keyboard shortcut opens Clicky. Default is **hold-to-talk** (hold `⌥/Alt + Space` or the launcher, speak, release), like heyclicky's hotkey. A text chat panel is always available as fallback. Shortcuts configurable. | P0 |
 | AS-2 | User asks in natural language and gets a streamed answer grounded in the current page plus the product's knowledge base. | P0 |
 | AS-3 | **Point the way:** the answer can highlight/spotlight specific elements on the page, with an animated cursor or arrow and a tooltip (the web equivalent of heyclicky's on-screen drawing). | P0 |
 | AS-4 | **Step-by-step walkthrough:** for multi-step how-tos, Clicky guides the user one step at a time and advances when it detects the step was completed (navigation or DOM change). | P0 |
 | AS-5 | Knowledge base: admins add help-center URLs, docs, or uploaded files (PDF/MD), which are crawled, chunked, and embedded for retrieval. | P0 |
-| AS-6 | Voice input (push-to-talk, browser speech API or hosted STT) and optional spoken replies. | P1 |
+| AS-6 | **Voice-first.** Push-to-talk voice input with live transcript (streaming hosted speech-to-text). Spoken replies via streaming text-to-speech, synced with on-screen pointing so Clicky "talks you through" the page. Users can interrupt by speaking or pressing the key again. Mute/text-only toggle; admins can disable voice per project. Graceful handling of denied mic permission. Audio is not stored; only transcripts are. | P0 |
 | AS-7 | Conversation persists across page navigations within a session. | P0 |
 | AS-8 | Handoff: "Talk to a human" escalates to the host's support channel (email/Intercom/Zendesk link) with conversation transcript attached. | P1 |
 | AS-9 | Localization: respond in the user's language. | P1 |
@@ -141,7 +141,7 @@ This is the tagline's core promise and the main reason product teams will pay.
 
 | Area | Requirement |
 |---|---|
-| Performance | First streamed token ≤ 1.5 s p50; single agent step ≤ 3 s p50. SDK loader adds < 20 ms to host main thread. |
+| Performance | Voice: end of speech → first spoken audio ≤ 2 s p50. First streamed text token ≤ 1.5 s p50; single agent step ≤ 3 s p50. SDK loader adds < 20 ms to host main thread. |
 | Reliability | 99.9% API uptime target. If Clicky is down, the widget fails silently and never breaks the host app. |
 | Security | Tenant isolation on every query; project keys are public but origin-bound; admin API uses secret keys; all traffic TLS; secrets encrypted at rest. CSP-compatible SDK (documented directives). |
 | Privacy | Redaction before data leaves the browser (PU-2). No screenshots stored. Configurable retention (default 90 days). DPA available. GDPR data export/delete endpoints. SOC 2 readiness as a v1+ goal. **The prototype's "SOC 2 aligned, GDPR ready" claim should not go live until true.** |
@@ -186,6 +186,7 @@ This keeps credentials and execution in the user's session (AG-8) and makes ever
 | LLM | Anthropic Claude: Sonnet 5.5 for chat/agent steps, Haiku 5.5 for classification, clustering, and summaries | Strong tool use; cost tiering |
 | Embeddings | Voyage AI (or OpenAI embeddings) into pgvector | |
 | Payments | Stripe Billing + metered usage | |
+| Voice | Deepgram (streaming speech-to-text) + ElevenLabs or Cartesia (streaming text-to-speech), proxied through our API so keys never reach the browser | Low latency, good quality; swappable behind one interface |
 | Email | Resend | Invites, digests |
 | Observability | Sentry, PostHog (for our own product analytics) | |
 | UI | Tailwind + shadcn/ui | Matches Lovable output, easy to port |
@@ -236,17 +237,18 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 
 ## 9. MVP definition & milestones
 
-**MVP goal:** a SaaS team can install Clicky in under 10 minutes, their users can ask questions and get guided (with highlights) or let the agent do simple tasks with confirmations, and the team can see conversations, topics, and core metrics.
+**MVP goal:** a SaaS team can install Clicky in under 10 minutes, their users can ask questions out loud (or by typing) and get talked through it (with highlights) or let the agent do simple tasks with confirmations, and the team can see conversations, topics, and core metrics.
 
 | Milestone | Contents | Est. |
 |---|---|---|
 | **M0 Foundations** | Monorepo, CI, Supabase schema, auth, orgs/projects, install snippet, demo app | 1 wk |
 | **M1 SDK + Ask** | Loader, Shadow-DOM widget, DOM snapshot + redaction, streamed chat, knowledge base (URL crawl + files), highlight/point-the-way | 2 wks |
+| **M1.5 Voice** | Push-to-talk, streaming STT/TTS, interruption, speech synced with pointing, mic-permission UX | 1 wk |
 | **M2 Agent** | Agent loop, action executor, policies + confirmation gates, step-by-step walkthroughs, error recovery | 2 wks |
 | **M3 Dashboard analytics** | Event ingest, overview metrics, conversation log, topic clustering, widget appearance/behavior settings | 1.5 wks |
 | **M4 Billing + marketing** | Stripe plans/usage limits, marketing site port from Lovable, docs, pricing page | 1 wk |
 | **M5 Hardening** | E2E tests on demo app, security review, performance budget, beta onboarding | 1 wk |
-| **v1 (post-MVP)** | Proactive struggle detection + nudges, friction map, onboarding flows, workflows, registered app actions, voice, digests, audit log, human handoff | 4–6 wks |
+| **v1 (post-MVP)** | Proactive struggle detection + nudges, friction map, onboarding flows, workflows, registered app actions, digests, audit log, human handoff | 4–6 wks |
 
 **Success metrics for beta customers:** ≥ 30% reduction in "how-to" support tickets; ≥ 70% of conversations rated resolved; median install time < 10 min; agent task success ≥ 85% on the demo app suite.
 
@@ -255,10 +257,10 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 1. ~~**Name & brand.**~~ **Decided: Clicky.** (Note for the client: clicky.com is an existing web-analytics product. A trademark check is recommended before launch.)
 2. ~~**Product shape.**~~ **Decided:** an embedded web version of heyclicky. SaaS companies install the SDK in their web app for their users. Not a desktop app, not a standalone analytics tool.
 3. ~~**Analytics depth.**~~ **Decided:** insights from Clicky's own interactions and struggle signals (§4.6). No full product analytics (pageview tracking, retention, session replay). Clicky's events can be forwarded to PostHog/Segment instead (AN-9).
-4. **Agent autonomy.** Comfortable with Clicky clicking/typing in customers' apps at MVP, or start with guide-only and add agent in v1?
+4. ~~**Agent autonomy.**~~ **Decided:** agent mode ships in MVP, with confirmation gates and admin policies (§4.4).
 5. **Pricing.** Accept the proposed model in §8, or does the client have targets?
 6. **Target customers / first design partners.** Any specific SaaS apps to pilot with? Their stack affects SDK priorities.
 7. **Compliance.** Any customers requiring SOC 2 / HIPAA / EU data residency at launch?
 8. **Hosting & accounts.** Who owns the Vercel, Supabase, Anthropic, and Stripe accounts? Budget for LLM usage during beta?
 9. ~~**Lovable prototype.**~~ **Decided:** idea board only. Nothing on it must be implemented.
-10. **Voice.** heyclicky is voice-first. Is voice an MVP must-have for this audience? We've put it in v1.
+10. ~~**Voice.**~~ **Decided:** voice-first in MVP (AS-1, AS-6, milestone M1.5).
