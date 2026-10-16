@@ -9,7 +9,7 @@ The client provided three inputs:
 | Input | What it is | What we take from it |
 |---|---|---|
 | Tagline: *"AI-powered website analytics and user behavior insights for product teams."* | Positioning | Buyer = product teams. Analytics/insights is a first-class pillar, not an afterthought. |
-| <https://clicky-competitor.lovable.app> | Lovable landing-page prototype (branded "Sheperd") | Product shape: an **AI agent embedded inside a SaaS product** via one script tag / npm package. Completes tasks, guides onboarding, proactively helps stuck users, and reports analytics back to the product team. |
+| <https://clicky-competitor.lovable.app> | Lovable landing-page prototype (branded "Sheperd"). **Idea board only; nothing on it is a committed requirement.** | Product shape: an **AI agent embedded inside a SaaS product** via one script tag / npm package. Completes tasks, guides onboarding, proactively helps stuck users, and reports analytics back to the product team. |
 | <https://www.heyclicky.com> | Reference competitor (consumer Mac app) | Interaction model: user asks out loud or in text, the assistant **sees the screen, explains, points/draws on screen, and can act as an agent**. Privacy posture (only looks when invoked, screenshots not stored). Tiered pricing by agent usage. |
 
 ### Product thesis
@@ -132,7 +132,7 @@ This is the tagline's core promise and the main reason product teams will pay.
 
 | ID | Requirement | Pri |
 |---|---|---|
-| MK-1 | Port the Lovable prototype's sections: Hero, Capabilities, Value props, Comparison ("Chatbots talk. Clicky works."), How it works, Demo, Proactive, FAQ, Testimonials, CTA. Replace placeholder metrics ("0") and fictional testimonials with real or clearly-illustrative content. | P0 |
+| MK-1 | Landing page (Hero, Capabilities, How it works, FAQ, CTA). The Lovable prototype is loose inspiration only: no placeholder metrics, fictional testimonials, or unearned compliance claims. | P0 |
 | MK-2 | Pricing page (see §7), Docs, Trust/Security, Privacy, Terms, Changelog. | P0 |
 | MK-3 | Live demo: Clicky running on a sample app the visitor can try. | P1 |
 | MK-4 | "Book a demo" (Cal.com/Calendly) and "Start free trial" → sign-up. | P0 |
@@ -252,7 +252,7 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 
 ## 10. Open questions for the client
 
-1. **Name & brand.** The prototype says "Sheperd", the repo and brief say "Clicky", and "Clicky" is also an existing web-analytics product (clicky.com) and close to heyclicky. Which name do we ship? Has trademark been checked?
+1. ~~**Name & brand.**~~ **Decided: Clicky.** (Note for the client: clicky.com is an existing web-analytics product. A trademark check is recommended before launch.)
 2. **Product shape.** Confirm the thesis in §1: an embedded web SDK for SaaS products (B2B), *not* a desktop app like heyclicky and *not* a pure analytics tool like Hotjar/Mixpanel. Is a desktop/browser-extension version ever in scope?
 3. **Analytics depth.** Is "website analytics" meant as insights *from Clicky interactions and struggle signals* (our assumption), or full product analytics (pageviews, funnels, retention, session replay) competing with PostHog/Hotjar? The latter is a much bigger build.
 4. **Agent autonomy.** Comfortable with Clicky clicking/typing in customers' apps at MVP, or start with guide-only and add agent in v1?
@@ -260,5 +260,5 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 6. **Target customers / first design partners.** Any specific SaaS apps to pilot with? Their stack affects SDK priorities.
 7. **Compliance.** Any customers requiring SOC 2 / HIPAA / EU data residency at launch?
 8. **Hosting & accounts.** Who owns the Vercel, Supabase, Anthropic, and Stripe accounts? Budget for LLM usage during beta?
-9. **Lovable prototype.** Is it a design reference only, or should we keep its exact copy/visuals? Can we get the Lovable project/source export?
+9. ~~**Lovable prototype.**~~ **Decided:** idea board only. Nothing on it must be implemented.
 10. **Voice.** heyclicky is voice-first. Is voice an MVP must-have for this audience? We've put it in v1.
