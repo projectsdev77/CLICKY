@@ -1,0 +1,39 @@
+{
+  "name": "@clicky/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "predev": "node scripts/copy-sdk.mjs",
+    "prebuild": "node scripts/copy-sdk.mjs",
+    "seed": "tsx scripts/seed.mts"
+  },
+  "dependencies": {
+    "@clicky/db": "workspace:*",
+    "@clicky/shared": "workspace:*",
+    "better-auth": "^1.7.10",
+    "drizzle-orm": "^0.45.4",
+    "next": "16.4.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@clicky/sdk": "workspace:*",
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

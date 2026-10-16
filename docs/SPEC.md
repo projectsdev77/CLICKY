@@ -181,7 +181,7 @@ This keeps credentials and execution in the user's session (AG-8) and makes ever
 | Monorepo | pnpm workspaces + Turborepo, TypeScript everywhere | Shared types between SDK, API, and dashboard |
 | Dashboard + API + marketing | Next.js (App Router) on Vercel | One deployable to start; split API out later if needed |
 | SDK | Vanilla TS + Preact in Shadow DOM, bundled with tsup/esbuild | Small bundle, framework-agnostic |
-| Database / auth / storage | Supabase (Postgres + pgvector + Auth + Storage) | Fast to ship; Lovable prototype already fits this ecosystem |
+| Database / auth | Postgres + pgvector via Drizzle ORM (hosted on Supabase/Neon, any managed Postgres works); Better Auth (email/password, magic link, Google, organizations, invites) | Portable, runs fully locally, no vendor lock-in for auth |
 | Background jobs | Inngest or Trigger.dev | Crawling, embeddings, clustering, digests |
 | LLM | Anthropic Claude: Sonnet 5.5 for chat/agent steps, Haiku 5.5 for classification, clustering, and summaries | Strong tool use; cost tiering |
 | Embeddings | Voyage AI (or OpenAI embeddings) into pgvector | |
