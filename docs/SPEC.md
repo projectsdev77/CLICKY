@@ -253,8 +253,8 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 ## 10. Open questions for the client
 
 1. ~~**Name & brand.**~~ **Decided: Clicky.** (Note for the client: clicky.com is an existing web-analytics product. A trademark check is recommended before launch.)
-2. **Product shape.** Confirm the thesis in §1: an embedded web SDK for SaaS products (B2B), *not* a desktop app like heyclicky and *not* a pure analytics tool like Hotjar/Mixpanel. Is a desktop/browser-extension version ever in scope?
-3. **Analytics depth.** Is "website analytics" meant as insights *from Clicky interactions and struggle signals* (our assumption), or full product analytics (pageviews, funnels, retention, session replay) competing with PostHog/Hotjar? The latter is a much bigger build.
+2. ~~**Product shape.**~~ **Decided:** an embedded web version of heyclicky. SaaS companies install the SDK in their web app for their users. Not a desktop app, not a standalone analytics tool.
+3. ~~**Analytics depth.**~~ **Decided:** insights from Clicky's own interactions and struggle signals (§4.6). No full product analytics (pageview tracking, retention, session replay). Clicky's events can be forwarded to PostHog/Segment instead (AN-9).
 4. **Agent autonomy.** Comfortable with Clicky clicking/typing in customers' apps at MVP, or start with guide-only and add agent in v1?
 5. **Pricing.** Accept the proposed model in §8, or does the client have targets?
 6. **Target customers / first design partners.** Any specific SaaS apps to pilot with? Their stack affects SDK priorities.
