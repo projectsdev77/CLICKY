@@ -2,8 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
-import { member, organization, project } from "@clicky/db";
+import { and, asc, eq, member, organization, project } from "@clicky/db";
 import { auth } from "./auth";
 import { db } from "./db";
 

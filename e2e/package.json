@@ -1,0 +1,13 @@
+{
+  "name": "@clicky/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "m0": "node m0-dashboard.mjs",
+    "m1": "node m1-assistant.mjs",
+    "all": "node m0-dashboard.mjs && node m1-assistant.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0"
+  }
+}

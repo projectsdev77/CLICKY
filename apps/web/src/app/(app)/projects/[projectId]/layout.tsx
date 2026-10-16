@@ -5,6 +5,8 @@ export default async function ProjectLayout({ children, params }: LayoutProps<"/
   const { projectId } = await params;
   const { project } = await requireProject(projectId);
   const tabs = [
+    { href: `/projects/${project.id}/conversations`, label: "Conversations" },
+    { href: `/projects/${project.id}/knowledge`, label: "Knowledge" },
     { href: `/projects/${project.id}/install`, label: "Install" },
     { href: `/projects/${project.id}/settings`, label: "Settings" },
   ];

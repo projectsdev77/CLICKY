@@ -49,6 +49,9 @@ export function App() {
               {n.label}
             </a>
           ))}
+          <a href="/help/index.html" target="_blank" rel="noreferrer">
+            Help center ↗
+          </a>
         </nav>
       </aside>
       <main>

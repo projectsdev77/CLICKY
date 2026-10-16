@@ -1,5 +1,5 @@
 import type { SdkInitResponse } from "@clicky/shared";
-import { mountWidget, type Widget } from "./widget";
+import { Assistant, getAnonymousId, type Caller } from "./assistant";
 
 export interface InitOptions {
   /** Your project's public key (starts with `pk_`). */
@@ -17,9 +17,10 @@ export interface IdentifyOptions {
 export const DEFAULT_API_URL = "https://app.clicky.ai";
 
 export class ClickyClient {
-  private widget: Widget | null = null;
+  private assistant: Assistant | null = null;
   private config: SdkInitResponse | null = null;
   private user: IdentifyOptions | null = null;
+  private projectKey = "";
   private starting: Promise<void> | null = null;
 
   /** Loads Clicky. Safe to call more than once; never throws into the host app. */
@@ -32,14 +33,25 @@ export class ClickyClient {
     return this.starting;
   }
 
+  /** Tells Clicky who the current user is, so conversations show up under their id in your dashboard. */
   identify(options: IdentifyOptions) {
     this.user = { userId: String(options.userId), traits: options.traits };
   }
 
+  /** Opens the assistant panel. */
+  open() {
+    this.assistant?.widget.open();
+  }
+
+  /** Asks Clicky a question programmatically, as if the user typed it. */
+  ask(question: string) {
+    return this.assistant?.ask(question, "text");
+  }
+
   /** Removes the widget from the page. */
   destroy() {
-    this.widget?.destroy();
-    this.widget = null;
+    this.assistant?.destroy();
+    this.assistant = null;
     this.config = null;
     this.starting = null;
   }
@@ -52,17 +64,28 @@ export class ClickyClient {
     return this.config;
   }
 
+  private caller = (): Caller => ({ projectKey: this.projectKey, anonymousId: getAnonymousId(), user: this.user });
+
   private async start({ projectKey, apiUrl = DEFAULT_API_URL }: InitOptions) {
-    const res = await fetch(`${apiUrl.replace(/\/+$/, "")}/api/v1/init`, {
+    const base = apiUrl.replace(/\/+$/, "");
+    const res = await fetch(`${base}/api/v1/init`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ projectKey, url: window.location.href, sdkVersion: __SDK_VERSION__ }),
     });
     if (!res.ok) {
       const { error } = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(error === "origin_not_allowed" ? `${window.location.origin} is not an allowed website for this project` : (error ?? `HTTP ${res.status}`));
+      throw new Error(
+        error === "origin_not_allowed"
+          ? `${window.location.origin} is not an allowed website for this project`
+          : (error ?? `HTTP ${res.status}`),
+      );
     }
+    this.projectKey = projectKey;
     this.config = (await res.json()) as SdkInitResponse;
-    this.widget = mountWidget(this.config);
+    if (document.readyState === "loading") {
+      await new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
+    }
+    this.assistant = new Assistant(this.config, base, this.caller);
   }
 }

@@ -3,10 +3,11 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
-import { project } from "@clicky/db";
-import { defaultProjectSettings, generatePublicKey, normalizeOrigin } from "@clicky/shared";
+import { after } from "next/server";
+import { and, eq, knowledgeSource, project } from "@clicky/db";
+import { defaultProjectSettings, generatePublicKey, normalizeOrigin, parseProjectSettings, projectSettingsSchema } from "@clicky/shared";
 import { auth } from "@/lib/auth";
+import { saveTextSource, syncUrlSource } from "@/lib/knowledge";
 import { db } from "@/lib/db";
 import { canManage, listMemberships, requireActiveOrg, requireProject, requireUser } from "@/lib/dal";
 
@@ -161,4 +162,79 @@ export async function acceptInvitation(invitationId: string): Promise<ActionStat
 export async function signOut() {
   await auth.api.signOut({ headers: await headers() });
   redirect("/sign-in");
+}
+
+export async function updateAssistantSettings(projectId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  const { project: proj } = await requireProject(projectId, { manage: true });
+  const current = parseProjectSettings(proj.settings);
+  const parsed = projectSettingsSchema.safeParse({
+    ...current,
+    appearance: {
+      ...current.appearance,
+      assistantName: text(formData, "assistantName"),
+      greeting: text(formData, "greeting"),
+      brandColor: text(formData, "brandColor"),
+      position: text(formData, "position"),
+      theme: text(formData, "theme"),
+    },
+    behavior: {
+      ...current.behavior,
+      mode: text(formData, "mode"),
+      voiceEnabled: formData.get("voiceEnabled") === "on",
+      customInstructions: text(formData, "customInstructions"),
+    },
+  });
+  if (!parsed.success) return { error: "Some values aren't valid. Check the name, color and instructions." };
+  await db.update(project).set({ settings: parsed.data }).where(eq(project.id, projectId));
+  revalidatePath(`/projects/${projectId}`, "layout");
+  return { ok: "Saved. Changes show up next time the page with Clicky loads." };
+}
+
+export async function addUrlSource(projectId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  await requireProject(projectId, { manage: true });
+  let url: URL;
+  try {
+    url = new URL(text(formData, "url"));
+    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error();
+  } catch {
+    return { error: "Enter a full web address, like https://help.acme.com/" };
+  }
+  const id = crypto.randomUUID();
+  await db.insert(knowledgeSource).values({ id, projectId, type: "url", url: url.toString(), title: url.host });
+  after(() => syncUrlSource(id));
+  revalidatePath(`/projects/${projectId}/knowledge`);
+  return { ok: "Reading your help center. This usually takes under a minute." };
+}
+
+export async function addTextSource(projectId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  await requireProject(projectId, { manage: true });
+  const title = text(formData, "title");
+  const body = text(formData, "body");
+  if (!title || body.length < 20) return { error: "Add a title and at least a sentence or two." };
+  if (body.length > 200_000) return { error: "That's too long. Split it into a few smaller articles." };
+  const id = crypto.randomUUID();
+  await db.insert(knowledgeSource).values({ id, projectId, type: "text", title, status: "syncing" });
+  await saveTextSource(id, projectId, title, body);
+  revalidatePath(`/projects/${projectId}/knowledge`);
+  return { ok: "Added." };
+}
+
+export async function resyncSource(projectId: string, sourceId: string) {
+  await requireProject(projectId, { manage: true });
+  const [source] = await db
+    .select()
+    .from(knowledgeSource)
+    .where(and(eq(knowledgeSource.id, sourceId), eq(knowledgeSource.projectId, projectId)));
+  if (source?.type !== "url") return;
+  await db.update(knowledgeSource).set({ status: "pending" }).where(eq(knowledgeSource.id, sourceId));
+  after(() => syncUrlSource(sourceId));
+  revalidatePath(`/projects/${projectId}/knowledge`);
+}
+
+export async function deleteSource(projectId: string, sourceId: string) {
+  await requireProject(projectId, { manage: true });
+  await db
+    .delete(knowledgeSource)
+    .where(and(eq(knowledgeSource.id, sourceId), eq(knowledgeSource.projectId, projectId)));
+  revalidatePath(`/projects/${projectId}/knowledge`);
 }

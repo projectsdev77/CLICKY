@@ -70,7 +70,7 @@ Priority: **P0** = MVP, **P1** = v1 shortly after MVP, **P2** = later.
 | AS-2 | User asks in natural language and gets a streamed answer grounded in the current page plus the product's knowledge base. | P0 |
 | AS-3 | **Point the way:** the answer can highlight/spotlight specific elements on the page, with an animated cursor or arrow and a tooltip (the web equivalent of heyclicky's on-screen drawing). | P0 |
 | AS-4 | **Step-by-step walkthrough:** for multi-step how-tos, Clicky guides the user one step at a time and advances when it detects the step was completed (navigation or DOM change). | P0 |
-| AS-5 | Knowledge base: admins add help-center URLs, docs, or uploaded files (PDF/MD), which are crawled, chunked, and embedded for retrieval. | P0 |
+| AS-5 | Knowledge base: admins add help-center URLs (crawled, up to 30 pages) or paste articles; content is chunked and retrieved per question. *Built (M1) with Postgres full-text search. Still to do: file uploads (PDF/MD), embedding search if full-text quality falls short.* | P0 |
 | AS-6 | **Voice-first.** Push-to-talk voice input with live transcript (streaming hosted speech-to-text). Spoken replies via streaming text-to-speech, synced with on-screen pointing so Clicky "talks you through" the page. Users can interrupt by speaking or pressing the key again. Mute/text-only toggle; admins can disable voice per project. Graceful handling of denied mic permission. Audio is not stored; only transcripts are. | P0 |
 | AS-7 | Conversation persists across page navigations within a session. | P0 |
 | AS-8 | Handoff: "Talk to a human" escalates to the host's support channel (email/Intercom/Zendesk link) with conversation transcript attached. | P1 |
@@ -182,11 +182,11 @@ This keeps credentials and execution in the user's session (AG-8) and makes ever
 | Dashboard + API + marketing | Next.js (App Router) on Vercel | One deployable to start; split API out later if needed |
 | SDK | Vanilla TS + Preact in Shadow DOM, bundled with tsup/esbuild | Small bundle, framework-agnostic |
 | Database / auth | Postgres + pgvector via Drizzle ORM (hosted on Supabase/Neon, any managed Postgres works); Better Auth (email/password, magic link, Google, organizations, invites) | Portable, runs fully locally, no vendor lock-in for auth |
-| Background jobs | Inngest or Trigger.dev | Crawling, embeddings, clustering, digests |
-| LLM | Anthropic Claude: Sonnet 5.5 for chat/agent steps, Haiku 5.5 for classification, clustering, and summaries | Strong tool use; cost tiering |
-| Embeddings | Voyage AI (or OpenAI embeddings) into pgvector | |
+| Background jobs | Next.js `after()` for now (knowledge crawl); move to Inngest or Trigger.dev when jobs need retries/schedules | Crawling, clustering, digests |
+| LLM | Anthropic Claude via the official SDK. Chat uses Claude Opus 5.5 at low effort (fast first word for voice), with server-side refusal fallback; model is configurable (`CLICKY_ASSISTANT_MODEL`). Haiku 5.5 is the candidate for clustering/summaries. A local stand-in answers when no key is set (dev/CI). | Quality + latency; cost tuning later with real traffic |
+| Retrieval | Postgres full-text search (M1). Embeddings into pgvector later, only if needed | No extra vendor to start |
 | Payments | Stripe Billing + metered usage | |
-| Voice | Deepgram (streaming speech-to-text) + ElevenLabs or Cartesia (streaming text-to-speech), proxied through our API so keys never reach the browser | Low latency, good quality; swappable behind one interface |
+| Voice | Deepgram (streaming speech-to-text, browser connects with a 60-second token from our API) + ElevenLabs (text-to-speech, proxied through our API). Without those keys the widget falls back to the browser's built-in speech recognition and voices | Low latency, good quality; works out of the box without vendors |
 | Email | Resend | Invites, digests |
 | Observability | Sentry, PostHog (for our own product analytics) | |
 | UI | Tailwind + shadcn/ui | Matches Lovable output, easy to port |
@@ -241,9 +241,9 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 
 | Milestone | Contents | Est. |
 |---|---|---|
-| **M0 Foundations** | Monorepo, CI, Supabase schema, auth, orgs/projects, install snippet, demo app | 1 wk |
-| **M1 SDK + Ask** | Loader, Shadow-DOM widget, DOM snapshot + redaction, streamed chat, knowledge base (URL crawl + files), highlight/point-the-way | 2 wks |
-| **M1.5 Voice** | Push-to-talk, streaming STT/TTS, interruption, speech synced with pointing, mic-permission UX | 1 wk |
+| **M0 Foundations** ✅ | Monorepo, CI, Postgres schema, auth, orgs/projects/team, install snippet + detection, demo app | 1 wk |
+| **M1 SDK + Ask** ✅ | Shadow-DOM widget, DOM snapshot + redaction, streamed chat, knowledge base (URL crawl + pasted articles), point-the-way, conversation log, assistant settings | 2 wks |
+| **M1.5 Voice** ✅ | Push-to-talk (hold Alt/⌥+Space or the mic button), STT/TTS with browser fallback, interruption, speech synced with pointing, mic-permission UX | 1 wk |
 | **M2 Agent** | Agent loop, action executor, policies + confirmation gates, step-by-step walkthroughs, error recovery | 2 wks |
 | **M3 Dashboard analytics** | Event ingest, overview metrics, conversation log, topic clustering, widget appearance/behavior settings | 1.5 wks |
 | **M4 Billing + marketing** | Stripe plans/usage limits, marketing site port from Lovable, docs, pricing page | 1 wk |

@@ -5,8 +5,7 @@
  * Safe to re-run.
  */
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
-import { account, createDb, member, organization, project, user } from "@clicky/db";
+import { account, createDb, eq, member, organization, project, user } from "@clicky/db";
 import { defaultProjectSettings } from "@clicky/shared";
 
 const db = createDb(process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/clicky");

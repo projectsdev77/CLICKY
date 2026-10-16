@@ -9,6 +9,7 @@ const initResponse = {
   appearance: settings.appearance,
   behavior: { mode: "agent", voiceEnabled: true },
   masking: settings.masking,
+  voice: { stt: "browser", tts: "browser" },
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -31,7 +32,7 @@ describe("ClickyClient", () => {
     expect(url).toBe("https://api.example.com/api/v1/init");
     expect(JSON.parse(String(init?.body))).toMatchObject({ projectKey: "pk_test" });
     const widget = document.querySelector("clicky-widget");
-    expect(widget?.shadowRoot?.querySelector("button")?.getAttribute("aria-label")).toBe("Open Clicky");
+    expect(widget?.shadowRoot?.querySelector(".launcher")?.getAttribute("aria-label")).toBe("Open Clicky");
   });
 
   it("only initialises once", async () => {

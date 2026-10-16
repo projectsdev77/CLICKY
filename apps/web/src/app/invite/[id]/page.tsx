@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { invitation, organization } from "@clicky/db";
+import { eq, invitation, organization } from "@clicky/db";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/dal";
 import { AcceptInvite } from "./accept-invite";

@@ -10,14 +10,16 @@
     "typecheck": "next typegen && tsc --noEmit",
     "predev": "node scripts/copy-sdk.mjs",
     "prebuild": "node scripts/copy-sdk.mjs",
-    "seed": "tsx scripts/seed.mts"
+    "seed": "tsx scripts/seed.mts",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@clicky/db": "workspace:*",
     "@clicky/shared": "workspace:*",
     "better-auth": "^1.7.10",
-    "drizzle-orm": "^0.45.4",
     "next": "16.4.2",
+    "node-html-parser": "^9.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
@@ -33,7 +35,8 @@
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@10.28.0"
 }

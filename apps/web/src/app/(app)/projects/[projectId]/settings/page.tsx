@@ -1,7 +1,8 @@
 import { canManage, requireProject } from "@/lib/dal";
 import { Card } from "@/components/ui";
 import { CopyBlock } from "@/components/copy-block";
-import { DangerZone, RenameForm } from "./settings-forms";
+import { parseProjectSettings } from "@clicky/shared";
+import { AssistantForm, DangerZone, RenameForm } from "./settings-forms";
 
 export default async function SettingsPage({ params }: PageProps<"/projects/[projectId]/settings">) {
   const { projectId } = await params;
@@ -12,6 +13,9 @@ export default async function SettingsPage({ params }: PageProps<"/projects/[pro
     <>
       <Card title="General">
         <RenameForm projectId={project.id} name={project.name} disabled={!manage} />
+      </Card>
+      <Card title="Assistant" description="How Clicky looks and behaves inside your app.">
+        <AssistantForm projectId={project.id} settings={parseProjectSettings(project.settings)} disabled={!manage} />
       </Card>
       <Card
         title="Project key"
