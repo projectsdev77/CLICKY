@@ -31,6 +31,24 @@ export const maskingSchema = z.object({
   selectors: z.array(z.string()).default([]),
 });
 
+export const proactiveSchema = z.object({
+  /** Offer help when someone seems stuck (rage clicks, repeated form errors, idle on a form). */
+  enabled: z.boolean().default(false),
+  /** Seconds on a form without submitting before Clicky offers help. */
+  stuckSeconds: z.number().int().min(15).max(600).default(45),
+});
+
+export const handoffSchema = z.object({
+  /** Where "Talk to a person" goes: a support page (https://…) or an email address (mailto:…). Empty = hidden. */
+  url: z
+    .string()
+    .max(500)
+    .regex(/^(https:\/\/|mailto:)/)
+    .or(z.literal(""))
+    .default(""),
+  label: z.string().min(1).max(40).default("Talk to a person"),
+});
+
 export const dataSchema = z.object({
   /** Conversations and signals older than this are deleted automatically. */
   retentionDays: z.number().int().min(7).max(730).default(90),
@@ -41,6 +59,8 @@ export const projectSettingsSchema = z.object({
   behavior: behaviorSchema.prefault({}),
   masking: maskingSchema.prefault({}),
   data: dataSchema.prefault({}),
+  proactive: proactiveSchema.prefault({}),
+  handoff: handoffSchema.prefault({}),
 });
 
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;

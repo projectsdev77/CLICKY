@@ -132,6 +132,7 @@ export async function POST(request: Request) {
         appName: proj.name,
         mode,
         customInstructions: settings.behavior.customInstructions,
+        handoffLabel: settings.handoff.url ? settings.handoff.label : undefined,
       }),
       mode,
       pageUrl,

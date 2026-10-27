@@ -14,7 +14,17 @@ const RAGE_CLICKS = 3;
 const RAGE_WINDOW_MS = 800;
 const RAGE_RADIUS = 40;
 const DEAD_CLICK_MS = 1000;
-const STUCK_MS = 45_000;
+const DEFAULT_STUCK_MS = 45_000;
+
+export type StruggleKind = "rage_click" | "form_error" | "form_stuck";
+
+export interface TrackerOptions {
+  /** Send events to the server (the project's "collect signals" setting). */
+  send: boolean;
+  /** Called when someone seems stuck, so the assistant can offer help. */
+  onStruggle?: (kind: StruggleKind, element: string) => void;
+  stuckMs?: number;
+}
 
 type Masking = SdkInitResponse["masking"];
 
@@ -46,9 +56,13 @@ export class SignalTracker {
   private teardown: (() => void)[] = [];
   private readonly sid = sessionId();
 
+  private formErrors: number[] = [];
+  private lastFormErrorAt = 0;
+
   constructor(
     private send: (body: { sessionId: string; events: SdkEvent[] }, beacon: boolean) => void,
     private masking: Masking,
+    private options: TrackerOptions = { send: true },
   ) {
     this.pageview();
     this.listen(window, "popstate", () => this.pageview());
@@ -66,11 +80,17 @@ export class SignalTracker {
     this.listen(document, "invalid", (e) => this.onInvalid(e), true);
     this.listen(document, "focusin", (e) => this.onFocus(e), true);
     this.listen(document, "submit", (e) => this.clearStuck(e.target as HTMLFormElement), true);
+    this.listen(document, "click", (e) => this.checkSubmitResult(e), true);
     this.listen(document, "visibilitychange", () => {
       if (document.visibilityState === "hidden") this.flush(true);
     });
     this.watchErrors();
     this.timer = window.setInterval(() => this.flush(false), FLUSH_MS);
+  }
+
+  /** Records an event the widget itself produces (e.g. a nudge being shown). */
+  record(type: SdkEvent["type"], element: string | null = null) {
+    this.push(type, element);
   }
 
   /** Custom event from Clicky.track(). */
@@ -90,7 +110,29 @@ export class SignalTracker {
     this.teardown.push(() => target.removeEventListener(type, handler, capture));
   }
 
+  /**
+   * After someone tries to submit a form, errors still on screen mean the attempt failed,
+   * even when the app keeps showing the same message (so no new message appears).
+   */
+  private checkSubmitResult(e: Event) {
+    const button = (e.target as Element | null)?.closest?.('button[type=submit], input[type=submit], button:not([type])');
+    const form = button?.closest("form");
+    if (!button || !form) return;
+    const attemptAt = Date.now();
+    setTimeout(() => {
+      // Skip if this attempt's error was already recorded (e.g. a new error message appeared).
+      if (!form.isConnected || this.lastFormErrorAt >= attemptAt) return;
+      const showing = form.querySelector('[role=alert], .error, .errors, [class*="error-message"], [aria-invalid="true"], :invalid');
+      if (showing && (showing as HTMLElement).offsetParent !== null) {
+        this.push("form_error", describeElement(button, this.masking), { reason: "submit_failed" });
+      }
+    }, 400);
+  }
+
   private push(type: SdkEvent["type"], element: string | null, props?: SdkEvent["props"]) {
+    if (type === "form_error") this.lastFormErrorAt = Date.now();
+    this.noticeStruggle(type, element);
+    if (!this.options.send) return;
     this.queue.push({ type, path: location.pathname, element, props, at: Date.now() });
     if (this.queue.length >= 50) this.flush(false);
   }
@@ -101,7 +143,21 @@ export class SignalTracker {
     this.send({ sessionId: this.sid, events }, beacon);
   }
 
+  /** Rage clicks, a second form error within a minute, or idling on a form count as being stuck. */
+  private noticeStruggle(type: SdkEvent["type"], element: string | null) {
+    const notify = this.options.onStruggle;
+    if (!notify) return;
+    if (type === "rage_click" || type === "form_stuck") notify(type, element ?? "");
+    if (type === "form_error") {
+      const now = Date.now();
+      this.formErrors = this.formErrors.filter((t) => now - t < 60_000);
+      this.formErrors.push(now);
+      if (this.formErrors.length === 2) notify("form_error", element ?? "");
+    }
+  }
+
   private pageview() {
+    this.formErrors = [];
     if (location.pathname === this.lastPath) return;
     this.lastPath = location.pathname;
     this.push("pageview", null);
@@ -178,8 +234,9 @@ export class SignalTracker {
       window.setTimeout(() => {
         if (location.pathname !== path || !form.isConnected) return;
         const label = form.getAttribute("aria-label") ?? form.querySelector("h1, h2, h3, legend")?.textContent?.trim() ?? "";
-        this.push("form_stuck", label ? `form "${label.slice(0, 60)}"` : "form", { seconds: STUCK_MS / 1000 });
-      }, STUCK_MS),
+        const stuckMs = this.options.stuckMs ?? DEFAULT_STUCK_MS;
+        this.push("form_stuck", label ? `form "${label.slice(0, 60)}"` : "form", { seconds: stuckMs / 1000 });
+      }, this.options.stuckMs ?? DEFAULT_STUCK_MS),
     );
   }
 

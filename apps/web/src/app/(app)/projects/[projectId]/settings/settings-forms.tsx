@@ -99,6 +99,19 @@ export function AssistantForm({
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input type="checkbox" name="voiceEnabled" defaultChecked={behavior.voiceEnabled} /> Voice (talk and listen)
         </label>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm">
+          <input type="checkbox" name="proactiveEnabled" defaultChecked={settings.proactive.enabled} /> Offer help when
+          someone seems stuck
+        </label>
+        <Field label="Offer help after this long on a form" hint="Seconds without submitting.">
+          <Input name="stuckSeconds" type="number" min={15} max={600} defaultValue={settings.proactive.stuckSeconds} />
+        </Field>
+        <Field label="“Talk to a person” goes to" hint="A support page (https://…) or an email address. Leave empty to hide the button.">
+          <Input name="handoffUrl" defaultValue={settings.handoff.url.replace(/^mailto:/, "")} placeholder="support@acme.com" />
+        </Field>
+        <Field label="Button label">
+          <Input name="handoffLabel" defaultValue={settings.handoff.label} maxLength={40} />
+        </Field>
         <Field label="Keep conversations and signals for">
           <select name="retentionDays" defaultValue={String(settings.data.retentionDays)} className={selectClass}>
             <option value="30">30 days</option>

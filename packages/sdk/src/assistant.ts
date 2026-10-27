@@ -1,5 +1,6 @@
 import { MarkerParser, RISKY_ACTION_RE, stripMarkers, type ActionResult, type AgentAction } from "@clicky/shared/client";
-import type { ChatEvent, SdkInitResponse, VoiceTokenResponse } from "@clicky/shared";
+import type { ChatEvent, HandoffResponse, SdkInitResponse, VoiceTokenResponse } from "@clicky/shared";
+import type { StruggleKind } from "./signals";
 import { ApiError, postEventStream, postJson } from "./api";
 import { blockedReason, executeAction, needsConfirmation, settle } from "./agent/executor";
 import { takeSnapshot, type PageSnapshot } from "./snapshot";
@@ -57,6 +58,9 @@ export class Assistant {
   private turn: Turn | null = null;
   private snapshot: PageSnapshot | null = null;
   private confirmByVoice: ((yes: boolean) => void) | null = null;
+  private nudgesShown = 0;
+  /** Lets the assistant record nudge events through the signal tracker. */
+  recordEvent: (type: "nudge_shown" | "nudge_accepted", element: string | null) => void = () => {};
   private teardown: (() => void)[] = [];
 
   constructor(
@@ -85,6 +89,7 @@ export class Assistant {
     for (const m of this.session.messages) this.widget.addMessage(m.role, m.text);
     if (this.session.open) this.widget.open();
     this.bindHotkey();
+    if (config.handoff.url) this.widget.setHandoff(config.handoff.label, () => void this.handoff());
 
     const pending = takePendingRun();
     if (pending && pending.conversationId === this.session.conversationId) void this.resume(pending);
@@ -112,6 +117,60 @@ export class Assistant {
       page: this.page(),
     };
     await this.drive(turn, postEventStream(`${this.apiUrl}/api/v1/chat`, body, turn.controller.signal));
+  }
+
+  /** Someone seems stuck: offer help once per page (at most twice per visit) if the team turned this on. */
+  nudge(kind: StruggleKind, element: string) {
+    if (!this.config.proactive.enabled || this.widget.isOpen || this.turn || this.nudgesShown >= 2) return;
+    const key = `clicky:nudged:${location.pathname}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // storage blocked: still nudge, the in-memory cap applies
+    }
+    this.nudgesShown++;
+    const name = element.match(/"([^"]+)"/)?.[1];
+    const text =
+      kind === "rage_click"
+        ? `Is ${name ? `“${name}”` : "something"} not working? I can help.`
+        : "Stuck on this form? I can help you finish it.";
+    const question =
+      kind === "rage_click"
+        ? `I keep clicking ${name ? `"${name}"` : "here"} and nothing happens. What should I do?`
+        : "I'm having trouble with this form. Can you help me fill it in?";
+    this.recordEvent("nudge_shown", element || null);
+    this.widget.showNudge(
+      text,
+      () => {
+        this.recordEvent("nudge_accepted", element || null);
+        void this.ask(question, "text");
+      },
+      () => {},
+    );
+  }
+
+  /** "Talk to a person": hands the conversation to the team's support channel. */
+  private async handoff() {
+    const { url, label } = this.config.handoff;
+    const conversationId = this.session.conversationId;
+    let transcript = "";
+    if (conversationId) {
+      try {
+        ({ transcript } = await postJson<HandoffResponse>(`${this.apiUrl}/api/v1/handoff`, { ...this.caller(), conversationId }));
+      } catch {
+        // still open the support channel
+      }
+    }
+    if (url.startsWith("mailto:")) {
+      const body = transcript ? `\n\n---\nMy conversation with ${this.config.appearance.assistantName}:\n${transcript}`.slice(0, 1800) : "";
+      location.href = `${url}?subject=${encodeURIComponent(`Help with ${location.hostname}`)}&body=${encodeURIComponent(body)}`;
+    } else {
+      const target = new URL(url);
+      if (conversationId) target.searchParams.set("clicky_conversation", conversationId);
+      window.open(target.toString(), "_blank", "noopener");
+    }
+    this.widget.addMessage("assistant", `Opening ${label}. I've passed this conversation along.`);
   }
 
   /** Stops whatever the assistant is doing. */

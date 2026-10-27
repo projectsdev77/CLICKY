@@ -22,6 +22,8 @@ export interface SdkInitResponse {
   appearance: ProjectSettings["appearance"];
   behavior: Pick<ProjectSettings["behavior"], "mode" | "voiceEnabled" | "blockedPaths" | "confirmKeywords" | "trackSignals">;
   masking: ProjectSettings["masking"];
+  proactive: ProjectSettings["proactive"];
+  handoff: ProjectSettings["handoff"];
   /** Which speech services the server can provide. "browser" means use the browser's built-in speech APIs. */
   voice: { stt: SpeechToTextProvider; tts: TextToSpeechProvider };
 }
@@ -93,7 +95,16 @@ export interface VoiceTokenResponse {
   expiresIn: number;
 }
 
-export const EVENT_TYPES = ["pageview", "rage_click", "dead_click", "form_error", "form_stuck", "custom"] as const;
+export const EVENT_TYPES = [
+  "pageview",
+  "rage_click",
+  "dead_click",
+  "form_error",
+  "form_stuck",
+  "custom",
+  "nudge_shown",
+  "nudge_accepted",
+] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const eventsRequestSchema = sdkCallerSchema.extend({
@@ -119,3 +130,11 @@ export const feedbackRequestSchema = sdkCallerSchema.extend({
   conversationId: z.string().max(64),
   rating: z.union([z.literal(1), z.literal(-1)]),
 });
+
+export const handoffRequestSchema = sdkCallerSchema.extend({
+  conversationId: z.string().max(64),
+});
+export interface HandoffResponse {
+  /** Plain-text transcript to pass to the support channel. */
+  transcript: string;
+}

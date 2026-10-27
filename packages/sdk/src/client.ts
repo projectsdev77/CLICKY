@@ -92,16 +92,30 @@ export class ClickyClient {
       );
     }
     this.projectKey = projectKey;
-    this.config = (await res.json()) as SdkInitResponse;
+    const config = (await res.json()) as SdkInitResponse;
+    // Defaults for settings an older server may not send yet.
+    config.proactive ??= { enabled: false, stuckSeconds: 45 };
+    config.handoff ??= { url: "", label: "Talk to a person" };
+    this.config = config;
     if (document.readyState === "loading") {
       await new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
     }
     this.assistant = new Assistant(this.config, base, this.caller);
-    if (this.config.behavior.trackSignals) {
-      this.signals = new SignalTracker(
+    const { trackSignals } = this.config.behavior;
+    const { proactive } = this.config;
+    if (trackSignals || proactive.enabled) {
+      const assistant = this.assistant;
+      const signals = new SignalTracker(
         (body, beacon) => postQuietly(`${base}/api/v1/events`, { ...this.caller(), ...body }, beacon),
         this.config.masking,
+        {
+          send: trackSignals,
+          stuckMs: proactive.stuckSeconds * 1000,
+          onStruggle: proactive.enabled ? (kind, element) => assistant.nudge(kind, element) : undefined,
+        },
       );
+      assistant.recordEvent = (type, element) => signals.record(type, element);
+      this.signals = signals;
     }
   }
 }

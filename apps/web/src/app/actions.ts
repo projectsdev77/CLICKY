@@ -20,6 +20,13 @@ function text(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** Accepts "support@acme.com", "mailto:…" or "https://…". */
+function normalizeHandoffUrl(value: string) {
+  if (!value) return "";
+  if (/^[^@\s:/]+@[^@\s]+\.[^@\s]+$/.test(value)) return `mailto:${value}`;
+  return value;
+}
+
 function lines(value: string) {
   return value
     .split(/[\n,]/)
@@ -201,8 +208,19 @@ export async function updateAssistantSettings(projectId: string, _: ActionState,
       blockedPaths: lines(text(formData, "blockedPaths")),
       confirmKeywords: lines(text(formData, "confirmKeywords")),
     },
+    data: { ...current.data, retentionDays: Number(text(formData, "retentionDays")) || current.data.retentionDays },
+    proactive: {
+      enabled: formData.get("proactiveEnabled") === "on",
+      stuckSeconds: Number(text(formData, "stuckSeconds")) || current.proactive.stuckSeconds,
+    },
+    handoff: {
+      url: normalizeHandoffUrl(text(formData, "handoffUrl")),
+      label: text(formData, "handoffLabel") || current.handoff.label,
+    },
   });
-  if (!parsed.success) return { error: "Some values aren't valid. Check the name, color and instructions." };
+  if (!parsed.success) {
+    return { error: "Some values aren't valid. Check the name, color, support link (https:// or an email) and instructions." };
+  }
   await db.update(project).set({ settings: parsed.data }).where(eq(project.id, projectId));
   revalidatePath(`/projects/${projectId}`, "layout");
   return { ok: "Saved. Changes show up next time the page with Clicky loads." };

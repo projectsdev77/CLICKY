@@ -9,7 +9,8 @@
     "m3": "node m3-analytics.mjs",
     "m4": "node m4-billing.mjs",
     "a11y": "node a11y.mjs",
-    "all": "node m0-dashboard.mjs && node m1-assistant.mjs && node m2-agent.mjs && node m3-analytics.mjs && node m4-billing.mjs && node a11y.mjs"
+    "v1": "node v1-features.mjs",
+    "all": "node m0-dashboard.mjs && node m1-assistant.mjs && node m2-agent.mjs && node m3-analytics.mjs && node m4-billing.mjs && node v1-features.mjs && node a11y.mjs"
   },
   "devDependencies": {
     "axe-core": "^4.14.0",

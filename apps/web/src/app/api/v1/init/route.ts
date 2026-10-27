@@ -29,6 +29,8 @@ export async function POST(request: Request) {
         trackSignals: settings.behavior.trackSignals,
       },
       masking: settings.masking,
+      proactive: settings.proactive,
+      handoff: settings.handoff,
       voice: voiceProviders(),
     };
     return NextResponse.json(response, { headers: corsHeaders(origin) });

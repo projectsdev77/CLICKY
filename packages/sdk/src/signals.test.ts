@@ -53,3 +53,21 @@ describe("SignalTracker", () => {
     expect(sent.find((e) => e.type === "custom")?.props).toEqual({ format: "csv", name: "report_created" });
   });
 });
+
+describe("struggle detection", () => {
+  it("notices rage clicks and repeated form errors, even when not sending events", () => {
+    document.body.innerHTML = `<button id="b">Save</button><input id="i" required>`;
+    const sent: unknown[] = [];
+    const struggles: string[] = [];
+    const t = new SignalTracker((b) => sent.push(b), { maskPII: true, selectors: [] }, { send: false, onStruggle: (k) => struggles.push(k) });
+    const b = document.getElementById("b")!;
+    for (let i = 0; i < 3; i++) b.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 5, clientY: 5 }));
+    const input = document.getElementById("i")!;
+    input.dispatchEvent(new Event("invalid"));
+    expect(struggles).toEqual(["rage_click"]);
+    input.dispatchEvent(new Event("invalid"));
+    expect(struggles).toEqual(["rage_click", "form_error"]);
+    t.destroy();
+    expect(sent).toEqual([]);
+  });
+});

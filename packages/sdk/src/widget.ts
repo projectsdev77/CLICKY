@@ -44,6 +44,10 @@ export interface Widget {
   confirm(question: string): { result: Promise<boolean>; answer(value: boolean): void };
   /** Shows "Helpful? 👍 👎" under the latest reply (replacing any earlier one). */
   showFeedback(onRate: (rating: 1 | -1) => void): void;
+  /** A small "need a hand?" bubble above the launcher (while the panel is closed). */
+  showNudge(text: string, onAccept: () => void, onDismiss: () => void): void;
+  /** Shows a "Talk to a person" link at the bottom of the panel. */
+  setHandoff(label: string | null, onClick: () => void): void;
   /** Shows a Stop button while an agent run is in progress (null hides it). */
   setRunning(onStop: (() => void) | null): void;
   destroy(): void;
@@ -123,6 +127,18 @@ const STYLES = /* css */ `
   .feedback { align-self: flex-start; display: flex; gap: 4px; align-items: center; color: var(--muted); font-size: 12px; margin-top: -4px; }
   .feedback button { border: 0; background: transparent; padding: 2px 6px; border-radius: 6px; font-size: 14px; color: var(--muted); }
   .feedback button:hover { background: var(--soft); }
+  .nudge {
+    max-width: 260px; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 14px;
+    background: var(--bg); color: var(--fg); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,.16); font-size: 14px;
+  }
+  .nudge[hidden] { display: none; }
+  .nudge .row { display: flex; gap: 8px; }
+  .nudge button { border-radius: 8px; padding: 4px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); }
+  .nudge button.yes { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+  .footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 14px 10px; }
+  .footer .hint { padding: 0; }
+  .handoff { border: 0; background: transparent; color: var(--fg); text-decoration: underline; font-size: 12px; padding: 0; }
+  .handoff[hidden] { display: none; }
   .stop { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 2px 10px; font-size: 12px; }
   .stop[hidden] { display: none; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -228,7 +244,37 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   composer.append(input, mic, send);
 
   const hint = el("div", "hint");
-  panel.append(header, log, caption, composer, hint);
+  const handoffBtn = el("button", "handoff");
+  handoffBtn.type = "button";
+  handoffBtn.hidden = true;
+  let onHandoff: () => void = () => {};
+  handoffBtn.addEventListener("click", () => onHandoff());
+  const footer = el("div", "footer");
+  footer.append(hint, handoffBtn);
+  panel.append(header, log, caption, composer, footer);
+
+  const nudge = el("div", "nudge");
+  nudge.hidden = true;
+  nudge.setAttribute("role", "status");
+  const nudgeText = el("div");
+  const nudgeRow = el("div", "row");
+  const nudgeYes = el("button", "yes");
+  nudgeYes.type = "button";
+  nudgeYes.textContent = "Yes, help me";
+  const nudgeNo = el("button");
+  nudgeNo.type = "button";
+  nudgeNo.textContent = "No thanks";
+  nudgeRow.append(nudgeYes, nudgeNo);
+  nudge.append(nudgeText, nudgeRow);
+  let nudgeHandlers: { accept(): void; dismiss(): void } | null = null;
+  nudgeYes.addEventListener("click", () => {
+    nudge.hidden = true;
+    nudgeHandlers?.accept();
+  });
+  nudgeNo.addEventListener("click", () => {
+    nudge.hidden = true;
+    nudgeHandlers?.dismiss();
+  });
 
   const launcher = el("button", "launcher", ICONS.logo);
   launcher.type = "button";
@@ -236,7 +282,7 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   launcher.setAttribute("aria-expanded", "false");
 
   const pointerLayer = el("div", "ptr-layer");
-  root.append(panel, launcher);
+  root.append(panel, nudge, launcher);
   wrapper.append(root, pointerLayer);
   shadow.append(style, wrapper);
   document.body.append(host);
@@ -250,7 +296,10 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     panel.hidden = !open;
     launcher.setAttribute("aria-expanded", String(open));
     launcher.setAttribute("aria-label", `${open ? "Close" : "Open"} ${appearance.assistantName}`);
-    if (open) log.scrollTop = log.scrollHeight;
+    if (open) {
+      log.scrollTop = log.scrollHeight;
+      nudge.hidden = true;
+    }
     handlers.onOpenChange(open);
   };
 
@@ -437,6 +486,17 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   return {
     host,
     pointer,
+    showNudge(text, accept, dismiss) {
+      if (isOpen) return;
+      nudgeText.textContent = text;
+      nudgeHandlers = { accept, dismiss };
+      nudge.hidden = false;
+    },
+    setHandoff(label, onClick) {
+      handoffBtn.hidden = !label;
+      handoffBtn.textContent = label ?? "";
+      onHandoff = onClick;
+    },
     addSteps,
     showFeedback,
     confirm,
