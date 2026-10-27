@@ -217,3 +217,17 @@ export async function getProblemElements(projectId: string, days: number, limit 
     total: Number(r.total),
   }));
 }
+
+/** Of users first seen in the range, how many completed each onboarding step. */
+export async function getOnboardingFunnel(projectId: string, stepIds: string[], days: number) {
+  const { from } = window(days);
+  const [total] = await rows<{ n: string }>(sql`
+    select count(*) as n from end_user where project_id = ${projectId} and first_seen_at >= ${from}`);
+  const counts = await rows<{ step_id: string; n: string }>(sql`
+    select oc.step_id, count(*) as n
+    from onboarding_completion oc join end_user u on u.id = oc.end_user_id
+    where oc.project_id = ${projectId} and u.first_seen_at >= ${from}
+    group by oc.step_id`);
+  const byStep = new Map(counts.map((c) => [c.step_id, Number(c.n)]));
+  return { users: Number(total?.n ?? 0), steps: stepIds.map((id) => ({ id, completed: byStep.get(id) ?? 0 })) };
+}

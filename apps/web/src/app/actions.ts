@@ -308,3 +308,53 @@ export async function deleteWorkflow(projectId: string, workflowId: string) {
   await db.update(project).set({ settings: updated }).where(eq(project.id, projectId));
   revalidatePath(`/projects/${projectId}/workflows`);
 }
+
+async function updateOnboarding(
+  projectId: string,
+  change: (current: ReturnType<typeof parseProjectSettings>["onboarding"]) => ReturnType<typeof parseProjectSettings>["onboarding"],
+): Promise<ActionState> {
+  const { project: proj } = await requireProject(projectId, { manage: true });
+  const settings = parseProjectSettings(proj.settings);
+  const parsed = projectSettingsSchema.safeParse({ ...settings, onboarding: change(settings.onboarding) });
+  if (!parsed.success) return { error: "Some values aren't valid (titles up to 80 characters, at most 10 steps)." };
+  await db.update(project).set({ settings: parsed.data }).where(eq(project.id, projectId));
+  revalidatePath(`/projects/${projectId}/onboarding`);
+  return { ok: "Saved." };
+}
+
+export async function saveOnboardingSettings(projectId: string, _: ActionState, formData: FormData) {
+  return updateOnboarding(projectId, (o) => ({
+    ...o,
+    enabled: formData.get("enabled") === "on",
+    title: text(formData, "title") || o.title,
+    audienceDays: Number(text(formData, "audienceDays")) || o.audienceDays,
+  }));
+}
+
+export async function addOnboardingStep(projectId: string, _: ActionState, formData: FormData) {
+  const type = text(formData, "type");
+  return updateOnboarding(projectId, (o) => ({
+    ...o,
+    steps: [
+      ...o.steps,
+      {
+        id: crypto.randomUUID().slice(0, 8),
+        title: text(formData, "title"),
+        doneWhen: { type: (type === "click" || type === "event" ? type : "page") as "page" | "click" | "event", value: text(formData, "value") },
+      },
+    ],
+  }));
+}
+
+export async function removeOnboardingStep(projectId: string, stepId: string) {
+  await updateOnboarding(projectId, (o) => ({ ...o, steps: o.steps.filter((s) => s.id !== stepId) }));
+}
+
+export async function moveOnboardingStep(projectId: string, stepId: string) {
+  await updateOnboarding(projectId, (o) => {
+    const steps = [...o.steps];
+    const i = steps.findIndex((s) => s.id === stepId);
+    if (i > 0) [steps[i - 1], steps[i]] = [steps[i]!, steps[i - 1]!];
+    return { ...o, steps };
+  });
+}

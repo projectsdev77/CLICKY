@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       masking: settings.masking,
       proactive: settings.proactive,
       handoff: settings.handoff,
+      hasOnboarding: settings.onboarding.enabled && settings.onboarding.steps.length > 0,
       voice: voiceProviders(),
     };
     return NextResponse.json(response, { headers: corsHeaders(origin) });

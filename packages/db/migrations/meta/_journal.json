@@ -43,6 +43,13 @@
       "when": 1793097729335,
       "tag": "0005_run_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793099638527,
+      "tag": "0006_onboarding",
+      "breakpoints": true
     }
   ]
 }

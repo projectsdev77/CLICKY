@@ -10,6 +10,7 @@ export default async function ProjectLayout({ children, params }: LayoutProps<"/
     { href: `/projects/${project.id}/friction`, label: "Friction" },
     { href: `/projects/${project.id}/knowledge`, label: "Knowledge" },
     { href: `/projects/${project.id}/workflows`, label: "Workflows" },
+    { href: `/projects/${project.id}/onboarding`, label: "Onboarding" },
     { href: `/projects/${project.id}/install`, label: "Install" },
     { href: `/projects/${project.id}/settings`, label: "Settings" },
   ];

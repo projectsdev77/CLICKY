@@ -58,6 +58,25 @@ export const workflowSchema = z.object({
 });
 export type Workflow = z.infer<typeof workflowSchema>;
 
+export const onboardingStepSchema = z.object({
+  id: z.string().max(40),
+  title: z.string().min(1).max(80),
+  /** How Clicky knows it's done: the user visits a page (path pattern), clicks something (label), or your app tracks an event. */
+  doneWhen: z.object({
+    type: z.enum(["page", "click", "event"]),
+    value: z.string().min(1).max(120),
+  }),
+});
+export type OnboardingStep = z.infer<typeof onboardingStepSchema>;
+
+export const onboardingSchema = z.object({
+  enabled: z.boolean().default(false),
+  title: z.string().min(1).max(60).default("Get started"),
+  /** Show the checklist to users first seen within this many days. */
+  audienceDays: z.number().int().min(1).max(365).default(14),
+  steps: z.array(onboardingStepSchema).max(10).default([]),
+});
+
 export const dataSchema = z.object({
   /** Conversations and signals older than this are deleted automatically. */
   retentionDays: z.number().int().min(7).max(730).default(90),
@@ -71,6 +90,7 @@ export const projectSettingsSchema = z.object({
   proactive: proactiveSchema.prefault({}),
   handoff: handoffSchema.prefault({}),
   workflows: z.array(workflowSchema).max(30).default([]),
+  onboarding: onboardingSchema.prefault({}),
 });
 
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;

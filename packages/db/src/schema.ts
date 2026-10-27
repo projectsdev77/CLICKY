@@ -278,3 +278,19 @@ export const subscription = pgTable("subscription", {
     .$onUpdate(() => new Date())
     .notNull(),
 });
+
+/** Which onboarding checklist steps each end user has completed (for the widget and the funnel). */
+export const onboardingCompletion = pgTable(
+  "onboarding_completion",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    endUserId: text("end_user_id")
+      .notNull()
+      .references(() => endUser.id, { onDelete: "cascade" }),
+    stepId: text("step_id").notNull(),
+    completedAt: timestamp("completed_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("onboarding_completion_unique_idx").on(table.endUserId, table.stepId), index("onboarding_completion_project_idx").on(table.projectId)],
+);

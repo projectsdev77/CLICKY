@@ -199,6 +199,8 @@ function Settings() {
           if (!tz) return setError("Choose a timezone.");
           setError("");
           setSaved(true);
+          // Tell Clicky (analytics + onboarding checklists).
+          (window as unknown as { Clicky?: { track(name: string): void } }).Clicky?.track("settings_saved");
         }}
       >
         <label>

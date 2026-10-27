@@ -24,6 +24,8 @@ export interface SdkInitResponse {
   masking: ProjectSettings["masking"];
   proactive: ProjectSettings["proactive"];
   handoff: ProjectSettings["handoff"];
+  /** The team set up an onboarding checklist (fetch it from /api/v1/onboarding). */
+  hasOnboarding: boolean;
   /** Which speech services the server can provide. "browser" means use the browser's built-in speech APIs. */
   voice: { stt: SpeechToTextProvider; tts: TextToSpeechProvider };
 }
@@ -152,3 +154,15 @@ export interface HandoffResponse {
   /** Plain-text transcript to pass to the support channel. */
   transcript: string;
 }
+
+export const onboardingStateRequestSchema = sdkCallerSchema;
+/** The checklist for this user, or null if they're not in the audience (or it's off). */
+export interface OnboardingState {
+  title: string;
+  steps: { id: string; title: string; doneWhen: { type: "page" | "click" | "event"; value: string } }[];
+  completed: string[];
+}
+
+export const onboardingCompleteRequestSchema = sdkCallerSchema.extend({
+  stepId: z.string().max(40),
+});

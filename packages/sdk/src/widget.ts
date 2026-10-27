@@ -48,6 +48,11 @@ export interface Widget {
   showNudge(text: string, onAccept: () => void, onDismiss: () => void): void;
   /** Shows a "Talk to a person" link at the bottom of the panel. */
   setHandoff(label: string | null, onClick: () => void): void;
+  /** The onboarding checklist at the top of the panel (null removes it). */
+  setChecklist(
+    checklist: { title: string; steps: { id: string; title: string; done: boolean }[] } | null,
+    handlers?: { onShowMe(stepId: string): void; onHide(): void },
+  ): void;
   /** Shows a Stop button while an agent run is in progress (null hides it). */
   setRunning(onStop: (() => void) | null): void;
   destroy(): void;
@@ -139,6 +144,20 @@ const STYLES = /* css */ `
   .footer .hint { padding: 0; }
   .handoff { border: 0; background: transparent; color: var(--fg); text-decoration: underline; font-size: 12px; padding: 0; }
   .handoff[hidden] { display: none; }
+  .checklist { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .checklist[hidden] { display: none; }
+  .checklist .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .checklist .title { font-weight: 600; font-size: 13px; margin: 0; }
+  .checklist ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .checklist li { display: flex; align-items: center; gap: 8px; }
+  .checklist li .mark { width: 16px; height: 16px; border-radius: 99px; border: 1.5px solid var(--border); display: grid; place-items: center; font-size: 10px; flex: none; }
+  .checklist li.done .mark { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+  .checklist li.done .label { color: var(--muted); text-decoration: line-through; }
+  .checklist li .label { flex: 1; }
+  .checklist button { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+  .checklist .hide { border: 0; padding: 0; color: var(--muted); text-decoration: underline; }
+  .badge { position: absolute; top: 2px; right: 2px; width: 12px; height: 12px; border-radius: 99px; background: #ef4444; border: 2px solid #fff; }
+  .badge[hidden] { display: none; }
   .stop { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 2px 10px; font-size: 12px; }
   .stop[hidden] { display: none; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -219,6 +238,8 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   stopBtn.addEventListener("click", () => onStop?.());
   header.append(dot, title, stopBtn, muteBtn, closeBtn);
 
+  const checklistEl = el("div", "checklist");
+  checklistEl.hidden = true;
   const log = el("div", "log");
   log.setAttribute("role", "log");
   log.setAttribute("aria-live", "polite");
@@ -251,7 +272,7 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   handoffBtn.addEventListener("click", () => onHandoff());
   const footer = el("div", "footer");
   footer.append(hint, handoffBtn);
-  panel.append(header, log, caption, composer, footer);
+  panel.append(header, checklistEl, log, caption, composer, footer);
 
   const nudge = el("div", "nudge");
   nudge.hidden = true;
@@ -280,6 +301,10 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   launcher.type = "button";
   launcher.setAttribute("aria-label", `Open ${appearance.assistantName}`);
   launcher.setAttribute("aria-expanded", "false");
+  const badge = el("span", "badge");
+  badge.hidden = true;
+  badge.setAttribute("aria-hidden", "true");
+  launcher.append(badge);
 
   const pointerLayer = el("div", "ptr-layer");
   root.append(panel, nudge, launcher);
@@ -483,9 +508,50 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     feedbackRow = row;
   };
 
+  const setChecklist: Widget["setChecklist"] = (checklist, handlers) => {
+    checklistEl.replaceChildren();
+    const remaining = checklist ? checklist.steps.filter((s) => !s.done).length : 0;
+    badge.hidden = !checklist || remaining === 0;
+    if (!checklist) {
+      checklistEl.hidden = true;
+      return;
+    }
+    checklistEl.hidden = false;
+    const top = el("div", "top");
+    const title = el("p", "title");
+    const doneCount = checklist.steps.length - remaining;
+    title.textContent = remaining ? `${checklist.title} · ${doneCount} of ${checklist.steps.length}` : `${checklist.title}: all done! 🎉`;
+    const hide = el("button", "hide");
+    hide.type = "button";
+    hide.textContent = "Hide";
+    hide.addEventListener("click", () => handlers?.onHide());
+    top.append(title, hide);
+    const list = el("ul");
+    for (const step of checklist.steps) {
+      const item = el("li", step.done ? "done" : "");
+      const mark = el("span", "mark");
+      mark.textContent = step.done ? "✓" : "";
+      mark.setAttribute("aria-label", step.done ? "Done" : "Not done");
+      const label = el("span", "label");
+      label.textContent = step.title;
+      item.append(mark, label);
+      if (!step.done) {
+        const show = el("button");
+        show.type = "button";
+        show.textContent = "Show me";
+        show.setAttribute("aria-label", `Show me how to ${step.title}`);
+        show.addEventListener("click", () => handlers?.onShowMe(step.id));
+        item.append(show);
+      }
+      list.append(item);
+    }
+    checklistEl.append(top, list);
+  };
+
   return {
     host,
     pointer,
+    setChecklist,
     showNudge(text, accept, dismiss) {
       if (isOpen) return;
       nudgeText.textContent = text;
