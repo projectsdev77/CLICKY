@@ -168,6 +168,12 @@ export class Assistant {
     clearPendingRun();
     if (this.turn !== turn) return;
     this.widget.setRunning(null);
+    const conversationId = this.session.conversationId;
+    if (!turn.controller.signal.aborted && conversationId) {
+      this.widget.showFeedback((rating) => {
+        void postJson(`${this.apiUrl}/api/v1/feedback`, { ...this.caller(), conversationId, rating }).catch(() => {});
+      });
+    }
     if (turn.speaker && turn.spoke && !turn.controller.signal.aborted) {
       this.widget.setStatus("speaking", "");
       await turn.speaker.drain();

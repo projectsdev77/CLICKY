@@ -245,7 +245,7 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 | **M1 SDK + Ask** ✅ | Shadow-DOM widget, DOM snapshot + redaction, streamed chat, knowledge base (URL crawl + pasted articles), point-the-way, conversation log, assistant settings | 2 wks |
 | **M1.5 Voice** ✅ | Push-to-talk (hold Alt/⌥+Space or the mic button), STT/TTS with browser fallback, interruption, speech synced with pointing, mic-permission UX | 1 wk |
 | **M2 Agent** ✅ | Agent loop (click/type/select/navigate/scroll), teach mode (wait_for_user walkthroughs), confirmation gates (click or say "yes"), admin blocked pages + keywords, guide-only mode, error reporting from the page, resume across full page loads, action audit log in transcripts | 2 wks |
-| **M3 Dashboard analytics** | Event ingest, overview metrics, conversation log, topic clustering, widget appearance/behavior settings | 1.5 wks |
+| **M3 Dashboard analytics** ✅ | Overview (KPIs, conversations/day, topics), automatic topic grouping + knowledge gaps (Claude Haiku 5.5, background), 👍/👎 feedback, struggle signals (rage/dead clicks, form errors, stuck on form) → friction map + problem elements, conversation filters, demo-data seed | 1.5 wks |
 | **M4 Billing + marketing** | Stripe plans/usage limits, marketing site port from Lovable, docs, pricing page | 1 wk |
 | **M5 Hardening** | E2E tests on demo app, security review, performance budget, beta onboarding | 1 wk |
 | **v1 (post-MVP)** | Proactive struggle detection + nudges, friction map, onboarding flows, workflows, registered app actions, digests, audit log, human handoff | 4–6 wks |

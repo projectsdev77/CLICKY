@@ -9,6 +9,13 @@ export class ApiError extends Error {
   }
 }
 
+/** Sends without waiting for an answer; uses sendBeacon when the page is going away. */
+export function postQuietly(url: string, body: unknown, beacon = false) {
+  const json = JSON.stringify(body);
+  if (beacon && navigator.sendBeacon?.(url, new Blob([json], { type: "text/plain" }))) return;
+  void fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: json, keepalive: true }).catch(() => {});
+}
+
 export async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
@@ -20,6 +27,7 @@ export async function postJson<T>(url: string, body: unknown, signal?: AbortSign
     const { error } = (await res.json().catch(() => ({}))) as { error?: string };
     throw new ApiError(error ?? `http_${res.status}`, res.status);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 

@@ -20,6 +20,8 @@ export const behaviorSchema = z.object({
   blockedPaths: z.array(z.string()).default([]),
   /** Extra phrases that force a confirmation before the agent acts (on top of built-in ones). */
   confirmKeywords: z.array(z.string()).default([]),
+  /** Collect page views and struggle signals (rage clicks, form errors…) for the friction map. */
+  trackSignals: z.boolean().default(true),
 });
 
 export const maskingSchema = z.object({

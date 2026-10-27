@@ -121,7 +121,7 @@ await dash.goto("http://localhost:3000/sign-in");
 await dash.fill("input[name=email]", "demo@clicky.test");
 await dash.fill("input[name=password]", "password123");
 await dash.click("button[type=submit]");
-await dash.waitForURL(/install/);
+await dash.waitForURL(/\/projects\//);
 await dash.goto("http://localhost:3000/projects/seed-project/conversations");
 await dash.locator("ul a").first().click();
 await dash.getByText("Click Delete").first().waitFor();

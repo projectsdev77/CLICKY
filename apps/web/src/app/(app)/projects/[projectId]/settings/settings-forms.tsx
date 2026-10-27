@@ -99,6 +99,10 @@ export function AssistantForm({
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input type="checkbox" name="voiceEnabled" defaultChecked={behavior.voiceEnabled} /> Voice (talk and listen)
         </label>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" name="trackSignals" defaultChecked={behavior.trackSignals} /> Collect page views and
+          struggle signals for the Friction page (never field values)
+        </label>
         <Field label="Pages where Clicky must not act" hint="One path per line. * matches one segment, ** any depth, e.g. /admin/**">
           <Textarea name="blockedPaths" defaultValue={behavior.blockedPaths.join("\n")} rows={3} placeholder="/billing&#10;/admin/**" />
         </Field>

@@ -17,6 +17,8 @@ export const env = {
   /** Without a key (or an `ant auth login` profile) the assistant runs a local stand-in model. */
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   ASSISTANT_MODEL: process.env.CLICKY_ASSISTANT_MODEL ?? "claude-opus-5-5",
+  /** Cheaper model for background work: grouping questions into topics. */
+  CLASSIFIER_MODEL: process.env.CLICKY_CLASSIFIER_MODEL ?? "claude-haiku-5-5",
   /** Set to "stub" to force the local stand-in even when a key is present (tests, demos). */
   ASSISTANT_PROVIDER: process.env.CLICKY_ASSISTANT_PROVIDER,
   DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,

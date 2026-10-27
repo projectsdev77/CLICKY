@@ -60,7 +60,7 @@ function textOf(el: Element): string {
   return clean((el as HTMLElement).innerText ?? el.textContent);
 }
 
-function accessibleName(el: Element): string {
+export function accessibleName(el: Element): string {
   const aria = el.getAttribute("aria-label");
   if (aria) return clean(aria);
   const labelledBy = el.getAttribute("aria-labelledby");
@@ -94,7 +94,7 @@ function accessibleName(el: Element): string {
   return clean(el.getAttribute("title") ?? el.getAttribute("name") ?? "");
 }
 
-function roleOf(el: Element): string {
+export function roleOf(el: Element): string {
   const role = el.getAttribute("role");
   if (role) return role;
   const tag = el.tagName.toLowerCase();

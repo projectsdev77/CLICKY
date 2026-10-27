@@ -18,12 +18,12 @@ export function AddUrlForm({ projectId }: { projectId: string }) {
   );
 }
 
-export function AddTextForm({ projectId }: { projectId: string }) {
+export function AddTextForm({ projectId, title }: { projectId: string; title?: string }) {
   const [state, action, pending] = useActionState(addTextSource.bind(null, projectId), null);
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} className="space-y-3" id="article">
       <Field label="Title">
-        <Input name="title" required placeholder="How refunds work" />
+        <Input name="title" required placeholder="How refunds work" defaultValue={title} autoFocus={!!title} />
       </Field>
       <Field label="Article">
         <Textarea name="body" required rows={6} className="font-sans" />

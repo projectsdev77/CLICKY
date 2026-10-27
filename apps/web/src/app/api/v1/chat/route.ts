@@ -1,9 +1,11 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { after } from "next/server";
 import { agentRun, and, conversation, desc, eq, message } from "@clicky/db";
 import { chatRequestSchema, isPathBlocked, parseProjectSettings } from "@clicky/shared";
 import { db } from "@/lib/db";
 import { searchKnowledge } from "@/lib/knowledge";
 import { buildSystemPrompt, buildUserTurn } from "@/lib/assistant/prompt";
+import { classifyConversation } from "@/lib/assistant/classify";
 import { runStep } from "@/lib/assistant/run";
 import { sseResponse } from "@/lib/sse";
 import {
@@ -104,6 +106,9 @@ export async function POST(request: Request) {
       messages: JSON.stringify(messages),
     })
     .returning();
+
+  // Once the reply has streamed, group the question into a topic (background).
+  after(() => classifyConversation(proj.id, convo.id));
 
   return sseResponse(origin, async (send) => {
     send({ type: "meta", conversationId: convo.id, runId: run!.id });

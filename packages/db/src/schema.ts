@@ -73,6 +73,9 @@ export const conversation = pgTable(
     mode: text("mode").$type<"ask" | "agent">().notNull().default("ask"),
     /** resolved | escalated | abandoned; null while open. Set from feedback/analytics later. */
     outcome: text("outcome"),
+    /** The user's rating of the conversation: 1 (helpful) or -1 (not helpful). */
+    feedback: integer("feedback"),
+    feedbackAt: timestamp("feedback_at"),
     entryUrl: text("entry_url"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -94,6 +97,10 @@ export const message = pgTable(
     content: text("content").notNull(),
     /** "voice" or "text": how the user asked. */
     inputMode: text("input_mode"),
+    /** For user messages: the topic the question was grouped under (set in the background). */
+    topicId: text("topic_id"),
+    /** For user messages: whether Clicky could answer it (false = knowledge gap). */
+    answered: boolean("answered"),
     pageUrl: text("page_url"),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
@@ -205,5 +212,47 @@ export const agentAction = pgTable(
   (table) => [
     index("agent_action_run_idx").on(table.runId),
     index("agent_action_project_created_idx").on(table.projectId, table.createdAt),
+  ],
+);
+
+/** A group of similar questions ("Exporting reports"), maintained automatically per project. */
+export const topic = pgTable(
+  "topic",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("topic_project_label_idx").on(table.projectId, sql`lower(${table.label})`)],
+);
+
+/**
+ * Lightweight behaviour signals from the SDK: page views and signs of struggle
+ * (rage clicks, dead clicks, form errors, stuck on a form). Not a full product
+ * analytics stream; see docs/SPEC.md.
+ */
+export const event = pgTable(
+  "event",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    endUserId: text("end_user_id").references(() => endUser.id, { onDelete: "cascade" }),
+    /** Per-tab session id from the SDK. */
+    sessionId: text("session_id").notNull(),
+    type: text("type").notNull(),
+    path: text("path").notNull(),
+    /** Redacted description of the element involved, e.g. `button "Save changes"`. */
+    element: text("element"),
+    props: jsonb("props").notNull().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("event_project_created_idx").on(table.projectId, table.createdAt),
+    index("event_project_type_path_idx").on(table.projectId, table.type, table.path),
   ],
 );

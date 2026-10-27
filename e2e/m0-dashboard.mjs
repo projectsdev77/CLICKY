@@ -71,7 +71,8 @@ await p2.fill('input[name=password]', "password123");
 await p2.click('button[type=submit]');
 await p2.waitForURL(/\/invite\//);
 await p2.click("text=Accept invitation");
-await p2.waitForURL(/\/projects\/seed-project\/install/);
+await p2.waitForURL(/\/projects\/seed-project\//);
+await p2.goto("http://localhost:3000/projects/seed-project/install");
 ok(true, "invitee joins Acme and lands on its project");
 ok((await p2.locator("textarea[name=origins]").isDisabled()), "viewer cannot edit allowed websites");
 

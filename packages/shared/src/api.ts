@@ -20,7 +20,7 @@ export type TextToSpeechProvider = "elevenlabs" | "browser";
 export interface SdkInitResponse {
   projectId: string;
   appearance: ProjectSettings["appearance"];
-  behavior: Pick<ProjectSettings["behavior"], "mode" | "voiceEnabled" | "blockedPaths" | "confirmKeywords">;
+  behavior: Pick<ProjectSettings["behavior"], "mode" | "voiceEnabled" | "blockedPaths" | "confirmKeywords" | "trackSignals">;
   masking: ProjectSettings["masking"];
   /** Which speech services the server can provide. "browser" means use the browser's built-in speech APIs. */
   voice: { stt: SpeechToTextProvider; tts: TextToSpeechProvider };
@@ -92,3 +92,30 @@ export interface VoiceTokenResponse {
   token: string;
   expiresIn: number;
 }
+
+export const EVENT_TYPES = ["pageview", "rage_click", "dead_click", "form_error", "form_stuck", "custom"] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+
+export const eventsRequestSchema = sdkCallerSchema.extend({
+  sessionId: z.string().min(8).max(64),
+  events: z
+    .array(
+      z.object({
+        type: z.enum(EVENT_TYPES),
+        path: z.string().max(500),
+        element: z.string().max(200).nullish(),
+        props: z.record(z.string(), z.union([z.string().max(200), z.number(), z.boolean(), z.null()])).optional(),
+        /** Client timestamp (ms). Clamped server-side. */
+        at: z.number(),
+      }),
+    )
+    .min(1)
+    .max(50),
+});
+export type EventsRequest = z.infer<typeof eventsRequestSchema>;
+export type SdkEvent = EventsRequest["events"][number];
+
+export const feedbackRequestSchema = sdkCallerSchema.extend({
+  conversationId: z.string().max(64),
+  rating: z.union([z.literal(1), z.literal(-1)]),
+});

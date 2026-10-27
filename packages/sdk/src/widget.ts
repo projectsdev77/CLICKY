@@ -42,6 +42,8 @@ export interface Widget {
   addSteps(): StepsHandle;
   /** Asks the user to approve a step. `result` resolves true (Allow) or false (Don't); `answer` settles it from elsewhere (voice). */
   confirm(question: string): { result: Promise<boolean>; answer(value: boolean): void };
+  /** Shows "Helpful? 👍 👎" under the latest reply (replacing any earlier one). */
+  showFeedback(onRate: (rating: 1 | -1) => void): void;
   /** Shows a Stop button while an agent run is in progress (null hides it). */
   setRunning(onStop: (() => void) | null): void;
   destroy(): void;
@@ -118,6 +120,9 @@ const STYLES = /* css */ `
   .confirm button { border-radius: 8px; padding: 6px 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); }
   .confirm button.allow { background: var(--brand); border-color: var(--brand); color: #fff; }
   .confirm.answered { opacity: .7; }
+  .feedback { align-self: flex-start; display: flex; gap: 4px; align-items: center; color: var(--muted); font-size: 12px; margin-top: -4px; }
+  .feedback button { border: 0; background: transparent; padding: 2px 6px; border-radius: 6px; font-size: 14px; color: var(--muted); }
+  .feedback button:hover { background: var(--soft); }
   .stop { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 2px 10px; font-size: 12px; }
   .stop[hidden] { display: none; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -392,10 +397,37 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     return { result, answer: (value: boolean) => answerFn(value) };
   };
 
+  let feedbackRow: HTMLElement | null = null;
+  const showFeedback = (onRate: (rating: 1 | -1) => void) => {
+    feedbackRow?.remove();
+    const row = el("div", "feedback");
+    const label = el("span");
+    label.textContent = "Helpful?";
+    const up = el("button");
+    up.type = "button";
+    up.textContent = "👍";
+    up.setAttribute("aria-label", "Helpful");
+    const down = el("button");
+    down.type = "button";
+    down.textContent = "👎";
+    down.setAttribute("aria-label", "Not helpful");
+    const rate = (rating: 1 | -1) => {
+      onRate(rating);
+      row.replaceChildren(rating === 1 ? "Thanks!" : "Thanks. We'll use this to improve.");
+    };
+    up.addEventListener("click", () => rate(1), { once: true });
+    down.addEventListener("click", () => rate(-1), { once: true });
+    row.append(label, up, down);
+    log.append(row);
+    log.scrollTop = log.scrollHeight;
+    feedbackRow = row;
+  };
+
   return {
     host,
     pointer,
     addSteps,
+    showFeedback,
     confirm,
     setRunning(handler) {
       onStop = handler;

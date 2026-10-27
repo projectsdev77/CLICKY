@@ -12,4 +12,4 @@ export function createDb(url: string) {
 }
 
 // Re-exported so apps share this package's drizzle-orm instance (a second copy breaks type identity).
-export { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+export { and, asc, count, desc, eq, gte, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";

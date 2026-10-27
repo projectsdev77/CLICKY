@@ -25,6 +25,7 @@ cp apps/web/.env.example apps/web/.env.local   # then set BETTER_AUTH_SECRET
 pnpm db:migrate
 pnpm db:seed      # demo@clicky.test / password123, with a project wired to the demo app
 pnpm dev          # dashboard on :3000, demo app on :5173
+pnpm db:seed-analytics   # optional: 30 days of made-up activity so the analytics pages have data
 ```
 
 Open http://localhost:3000, sign in as the demo user, then open http://localhost:5173. The Clicky launcher appears in the demo app and the dashboard's Install page shows it as installed.
@@ -48,6 +49,10 @@ Emails (magic links, invitations) are printed to the web server log until an ema
 1. The SDK (`packages/sdk`) takes a snapshot of the page: interactive elements with refs (`[e12] button "Export"`), headings and visible text. Passwords, payment fields, `data-clicky-mask` elements and personal data (emails, phone and card numbers) are masked in the browser; `data-clicky-ignore` subtrees are skipped.
 2. `POST /api/v1/chat` checks the project key against the request's website, finds relevant help-center chunks, and streams Claude's reply back as server-sent events.
 3. Replies point at things by writing `{{point:e12}}`. The widget strips these markers and moves an animated pointer to the element: right away for typed questions, or in time with the sentence being spoken for voice questions.
+
+## Analytics
+
+The SDK sends lightweight signals (page views, rage clicks, dead clicks, form errors, people stuck on a form; never field values) to `/api/v1/events`, batched every 10 seconds. After each reply, a background job groups the question into a topic and flags it if Clicky couldn't answer (Claude Haiku 5.5; a keyword stand-in without a key). The dashboard's Overview, Friction and Knowledge pages read from these. Projects can switch signal collection off in Settings.
 
 ## Common commands
 

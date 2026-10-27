@@ -1,5 +1,7 @@
 import type { SdkInitResponse } from "@clicky/shared";
 import { Assistant, getAnonymousId, type Caller } from "./assistant";
+import { postQuietly } from "./api";
+import { SignalTracker } from "./signals";
 
 export interface InitOptions {
   /** Your project's public key (starts with `pk_`). */
@@ -18,6 +20,7 @@ export const DEFAULT_API_URL = "https://app.clicky.ai";
 
 export class ClickyClient {
   private assistant: Assistant | null = null;
+  private signals: SignalTracker | null = null;
   private config: SdkInitResponse | null = null;
   private user: IdentifyOptions | null = null;
   private projectKey = "";
@@ -38,6 +41,11 @@ export class ClickyClient {
     this.user = { userId: String(options.userId), traits: options.traits };
   }
 
+  /** Records a custom event (e.g. "report_created") for your Clicky analytics. */
+  track(name: string, props?: Record<string, string | number | boolean | null>) {
+    this.signals?.track(name, props);
+  }
+
   /** Opens the assistant panel. */
   open() {
     this.assistant?.widget.open();
@@ -52,6 +60,8 @@ export class ClickyClient {
   destroy() {
     this.assistant?.destroy();
     this.assistant = null;
+    this.signals?.destroy();
+    this.signals = null;
     this.config = null;
     this.starting = null;
   }
@@ -87,5 +97,11 @@ export class ClickyClient {
       await new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
     }
     this.assistant = new Assistant(this.config, base, this.caller);
+    if (this.config.behavior.trackSignals) {
+      this.signals = new SignalTracker(
+        (body, beacon) => postQuietly(`${base}/api/v1/events`, { ...this.caller(), ...body }, beacon),
+        this.config.masking,
+      );
+    }
   }
 }

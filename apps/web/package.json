@@ -11,7 +11,8 @@
     "predev": "node scripts/copy-sdk.mjs",
     "prebuild": "node scripts/copy-sdk.mjs",
     "seed": "tsx scripts/seed.mts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:analytics": "tsx scripts/seed-analytics.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

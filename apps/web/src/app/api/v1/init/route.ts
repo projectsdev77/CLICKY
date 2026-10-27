@@ -26,6 +26,7 @@ export async function POST(request: Request) {
         voiceEnabled: settings.behavior.voiceEnabled,
         blockedPaths: settings.behavior.blockedPaths,
         confirmKeywords: settings.behavior.confirmKeywords,
+        trackSignals: settings.behavior.trackSignals,
       },
       masking: settings.masking,
       voice: voiceProviders(),

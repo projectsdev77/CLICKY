@@ -7,7 +7,7 @@ import type { Pointer } from "../pointer";
 const pointer = { pointAt: vi.fn(), hide: vi.fn() } as unknown as Pointer;
 const config = {
   masking: { maskPII: true, selectors: [] },
-  behavior: { mode: "agent" as const, voiceEnabled: true, blockedPaths: ["/billing"], confirmKeywords: ["archive"] },
+  behavior: { mode: "agent" as const, voiceEnabled: true, blockedPaths: ["/billing"], confirmKeywords: ["archive"], trackSignals: true },
 };
 
 function ctx(refs: Record<string, Element>) {
