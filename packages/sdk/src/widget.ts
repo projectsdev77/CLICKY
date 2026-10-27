@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { SdkInitResponse } from "@clicky/shared";
 import { Pointer, POINTER_STYLES } from "./pointer";
 
@@ -226,13 +227,13 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   title.textContent = appearance.assistantName;
   const muteBtn = el("button", "icon-btn", ICONS.sound);
   muteBtn.type = "button";
-  muteBtn.setAttribute("aria-label", "Mute spoken replies");
+  muteBtn.setAttribute("aria-label", t("mute"));
   const closeBtn = el("button", "icon-btn", ICONS.close);
   closeBtn.type = "button";
-  closeBtn.setAttribute("aria-label", `Close ${appearance.assistantName}`);
+  closeBtn.setAttribute("aria-label", t("close", { name: appearance.assistantName }));
   const stopBtn = el("button", "stop");
   stopBtn.type = "button";
-  stopBtn.textContent = "Stop";
+  stopBtn.textContent = t("stop");
   stopBtn.hidden = true;
   let onStop: (() => void) | null = null;
   stopBtn.addEventListener("click", () => onStop?.());
@@ -253,15 +254,15 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   const composer = el("form", "composer");
   const input = el("input");
   input.type = "text";
-  input.placeholder = "Ask anything…";
-  input.setAttribute("aria-label", `Ask ${appearance.assistantName}`);
+  input.placeholder = t("askPlaceholder");
+  input.setAttribute("aria-label", t("ask", { name: appearance.assistantName }));
   input.maxLength = 2000;
   const mic = el("button", "mic", ICONS.mic);
   mic.type = "button";
-  mic.setAttribute("aria-label", "Talk (hold to speak)");
+  mic.setAttribute("aria-label", t("talk"));
   const send = el("button", "send", ICONS.send);
   send.type = "submit";
-  send.setAttribute("aria-label", "Send");
+  send.setAttribute("aria-label", t("send"));
   composer.append(input, mic, send);
 
   const hint = el("div", "hint");
@@ -281,10 +282,10 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   const nudgeRow = el("div", "row");
   const nudgeYes = el("button", "yes");
   nudgeYes.type = "button";
-  nudgeYes.textContent = "Yes, help me";
+  nudgeYes.textContent = t("nudgeYes");
   const nudgeNo = el("button");
   nudgeNo.type = "button";
-  nudgeNo.textContent = "No thanks";
+  nudgeNo.textContent = t("nudgeNo");
   nudgeRow.append(nudgeYes, nudgeNo);
   nudge.append(nudgeText, nudgeRow);
   let nudgeHandlers: { accept(): void; dismiss(): void } | null = null;
@@ -299,7 +300,7 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
 
   const launcher = el("button", "launcher", ICONS.logo);
   launcher.type = "button";
-  launcher.setAttribute("aria-label", `Open ${appearance.assistantName}`);
+  launcher.setAttribute("aria-label", t("open", { name: appearance.assistantName }));
   launcher.setAttribute("aria-expanded", "false");
   const badge = el("span", "badge");
   badge.hidden = true;
@@ -320,7 +321,7 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     isOpen = open;
     panel.hidden = !open;
     launcher.setAttribute("aria-expanded", String(open));
-    launcher.setAttribute("aria-label", `${open ? "Close" : "Open"} ${appearance.assistantName}`);
+    launcher.setAttribute("aria-label", t(open ? "close" : "open", { name: appearance.assistantName }));
     if (open) {
       log.scrollTop = log.scrollHeight;
       nudge.hidden = true;
@@ -456,10 +457,10 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
       const actions = el("div", "actions");
       const allow = el("button", "allow");
       allow.type = "button";
-      allow.textContent = "Allow";
+      allow.textContent = t("allow");
       const deny = el("button");
       deny.type = "button";
-      deny.textContent = "Don't";
+      deny.textContent = t("deny");
       actions.append(allow, deny);
       card.append(text, actions);
       log.append(card);
@@ -472,7 +473,7 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
         settled = true;
         card.classList.add("answered");
         allow.disabled = deny.disabled = true;
-        text.textContent = `${question} ${value ? "(allowed)" : "(declined)"}`;
+        text.textContent = `${question} ${value ? t("allowed") : t("declined")}`;
         resolve(value);
       };
       allow.addEventListener("click", () => answer(true), { once: true });
@@ -487,18 +488,18 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     feedbackRow?.remove();
     const row = el("div", "feedback");
     const label = el("span");
-    label.textContent = "Helpful?";
+    label.textContent = t("helpful");
     const up = el("button");
     up.type = "button";
     up.textContent = "👍";
-    up.setAttribute("aria-label", "Helpful");
+    up.setAttribute("aria-label", t("helpfulYes"));
     const down = el("button");
     down.type = "button";
     down.textContent = "👎";
-    down.setAttribute("aria-label", "Not helpful");
+    down.setAttribute("aria-label", t("helpfulNo"));
     const rate = (rating: 1 | -1) => {
       onRate(rating);
-      row.replaceChildren(rating === 1 ? "Thanks!" : "Thanks. We'll use this to improve.");
+      row.replaceChildren(rating === 1 ? t("thanks") : t("thanksDown"));
     };
     up.addEventListener("click", () => rate(1), { once: true });
     down.addEventListener("click", () => rate(-1), { once: true });
@@ -520,10 +521,12 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     const top = el("div", "top");
     const title = el("p", "title");
     const doneCount = checklist.steps.length - remaining;
-    title.textContent = remaining ? `${checklist.title} · ${doneCount} of ${checklist.steps.length}` : `${checklist.title}: all done! 🎉`;
+    title.textContent = remaining
+      ? t("progress", { title: checklist.title, done: doneCount, total: checklist.steps.length })
+      : t("allDone", { title: checklist.title });
     const hide = el("button", "hide");
     hide.type = "button";
-    hide.textContent = "Hide";
+    hide.textContent = t("hide");
     hide.addEventListener("click", () => handlers?.onHide());
     top.append(title, hide);
     const list = el("ul");
@@ -538,8 +541,8 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
       if (!step.done) {
         const show = el("button");
         show.type = "button";
-        show.textContent = "Show me";
-        show.setAttribute("aria-label", `Show me how to ${step.title}`);
+        show.textContent = t("showMe");
+        show.setAttribute("aria-label", t("showMeAria", { step: step.title }));
         show.addEventListener("click", () => handlers?.onShowMe(step.id));
         item.append(show);
       }
@@ -579,17 +582,17 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     setStatus(status, text) {
       wrapper.dataset.status = status;
       caption.textContent =
-        text ?? (status === "listening" ? "Listening…" : status === "thinking" ? "Thinking…" : "");
+        text ?? (status === "listening" ? t("listening") : status === "thinking" ? t("thinking") : "");
     },
     setMuted(muted) {
       muteBtn.innerHTML = muted ? ICONS.muted : ICONS.sound;
-      muteBtn.setAttribute("aria-label", muted ? "Unmute spoken replies" : "Mute spoken replies");
+      muteBtn.setAttribute("aria-label", muted ? t("unmute") : t("mute"));
       muteBtn.setAttribute("aria-pressed", String(muted));
     },
     setVoiceAvailable(available) {
       mic.hidden = !available;
       muteBtn.hidden = !available;
-      hint.textContent = available ? `Hold ${HOTKEY_LABEL} anywhere to talk.` : "";
+      hint.textContent = available ? t("hint", { hotkey: HOTKEY_LABEL }) : "";
     },
     destroy() {
       pointer.hide();

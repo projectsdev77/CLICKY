@@ -6,6 +6,7 @@ import { Card } from "@/components/ui";
 import { Stat } from "@/components/stat";
 import { DailyColumns, RankedBars } from "@/components/charts";
 import { RangeFilter } from "@/components/range-filter";
+import { DigestPreviewButton } from "./digest-preview";
 
 const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : "–");
 
@@ -34,7 +35,10 @@ export default async function OverviewPage({ params, searchParams }: PageProps<"
 
   return (
     <>
-      <RangeFilter maxDays={plan.limits.analyticsDays} days={days} basePath={`${base}/overview`} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <RangeFilter maxDays={plan.limits.analyticsDays} days={days} basePath={`${base}/overview`} />
+        <DigestPreviewButton projectId={project.id} />
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="sm:row-span-2">
           <Stat

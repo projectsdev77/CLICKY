@@ -231,3 +231,56 @@ export async function getOnboardingFunnel(projectId: string, stepIds: string[], 
   const byStep = new Map(counts.map((c) => [c.step_id, Number(c.n)]));
   return { users: Number(total?.n ?? 0), steps: stepIds.map((id) => ({ id, completed: byStep.get(id) ?? 0 })) };
 }
+
+export async function getActivity(projectId: string, days: number, limit = 500) {
+  const { from } = window(days);
+  return rows<{
+    id: string;
+    created_at: Date;
+    description: string;
+    name: string;
+    status: string | null;
+    output: string | null;
+    needs_confirmation: boolean;
+    page_url: string | null;
+    conversation_id: string;
+    external_id: string | null;
+  }>(sql`
+    select a.id, a.created_at, a.description, a.name, a.status, a.output, a.needs_confirmation, a.page_url,
+      r.conversation_id, u.external_id
+    from agent_action a
+    join agent_run r on r.id = a.run_id
+    join end_user u on u.id = r.end_user_id
+    where a.project_id = ${projectId} and a.created_at >= ${from}
+    order by a.created_at desc
+    limit ${limit}`);
+}
+
+export async function getConversationsForExport(projectId: string, days: number) {
+  const { from } = window(days);
+  return rows<{
+    id: string;
+    created_at: Date;
+    external_id: string | null;
+    entry_url: string | null;
+    mode: string;
+    outcome: string | null;
+    feedback: number | null;
+    questions: string;
+    first_question: string | null;
+    topics: string | null;
+    voice: boolean;
+  }>(sql`
+    select c.id, c.created_at, u.external_id, c.entry_url, c.mode, c.outcome, c.feedback,
+      count(m.id) filter (where m.role = 'user') as questions,
+      (array_agg(m.content order by m.created_at) filter (where m.role = 'user'))[1] as first_question,
+      string_agg(distinct t.label, '; ') as topics,
+      coalesce(bool_or(m.input_mode = 'voice'), false) as voice
+    from conversation c
+    join end_user u on u.id = c.end_user_id
+    left join message m on m.conversation_id = c.id
+    left join topic t on t.id = m.topic_id
+    where c.project_id = ${projectId} and c.created_at >= ${from}
+    group by c.id, u.external_id
+    order by c.created_at desc`);
+}

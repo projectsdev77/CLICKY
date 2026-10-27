@@ -120,6 +120,10 @@ export function AssistantForm({
           </select>
         </Field>
         <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" name="weeklyDigest" defaultChecked={settings.data.weeklyDigest} /> Email a weekly summary
+          to owners and admins
+        </label>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2">
           <input type="checkbox" name="trackSignals" defaultChecked={behavior.trackSignals} /> Collect page views and
           struggle signals for the Friction page (never field values)
         </label>

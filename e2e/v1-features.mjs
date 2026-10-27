@@ -30,7 +30,7 @@ ok((await w.locator(".nudge").textContent()).includes("“Export” not working?
 await app.screenshot({ path: `${shots}/v1-nudge.png` });
 await w.locator(".nudge button.yes").click();
 await idle();
-ok((await w.locator(".msg.user").last().textContent()).includes('I keep clicking "Export"'), "accepting the nudge asks for help with context");
+ok((await w.locator(".msg.user").last().textContent()).includes("I keep clicking “Export”"), "accepting the nudge asks for help with context");
 for (let i = 0; i < 3; i++) await app.getByRole("button", { name: "Export", exact: true }).click();
 await app.waitForTimeout(500);
 ok(await w.locator(".nudge").isHidden(), "only one nudge per page");
@@ -137,6 +137,26 @@ await newbie.reload();
 await nw.locator(".launcher").waitFor({ state: "attached" });
 await newbie.waitForTimeout(1000);
 ok(await nw.locator(".checklist").isHidden(), "users past the audience window don't see the checklist");
+
+// --- Activity log, CSV exports, weekly digest preview
+await dash.goto("http://localhost:3000/projects/seed-project/activity");
+ok(await dash.getByRole("link", { name: /Export every report/ }).first().isVisible(), "activity log lists the app action");
+const activityCsv = await (await dash.request.get("http://localhost:3000/projects/seed-project/activity/export?days=7")).text();
+ok(activityCsv.startsWith("time,user_id,action,step") && activityCsv.includes("app_action"), "activity CSV downloads");
+const convCsv = await (await dash.request.get("http://localhost:3000/projects/seed-project/conversations/export?days=7")).text();
+ok(convCsv.startsWith("started,conversation_id") && convCsv.includes("I keep clicking “Export”") && convCsv.includes(",escalated,"), "conversations CSV downloads");
+const signedOut = await fetch("http://localhost:3000/projects/seed-project/conversations/export", { redirect: "manual" });
+ok(signedOut.status !== 200, "CSV export needs sign-in");
+await dash.goto("http://localhost:3000/projects/seed-project/overview");
+await dash.getByRole("button", { name: "Email me this week's summary" }).click();
+await dash.getByText("Sent to demo@clicky.test.").waitFor();
+ok(true, "digest preview sent (logged without an email provider)");
+
+// --- Widget in another language
+const es = await (await browser.newContext({ locale: "es-ES" })).newPage();
+await es.goto("http://localhost:5173/reports");
+await es.locator("clicky-widget .launcher").click();
+ok((await es.locator("clicky-widget input").getAttribute("placeholder")) === "Pregunta lo que quieras…", "widget UI follows the browser language");
 
 setSettings("{}");
 psql("delete from conversation where project_id='seed-project'; delete from event where project_id='seed-project'; delete from onboarding_completion where project_id='seed-project'");

@@ -10,6 +10,8 @@ import { auth } from "@/lib/auth";
 import { saveTextSource, syncUrlSource } from "@/lib/knowledge";
 import { getBillingState, startTrial } from "@/lib/billing";
 import { deleteEndUserData } from "@/lib/retention";
+import { buildDigest } from "@/lib/digest";
+import { sendEmail } from "@/lib/email";
 import { db } from "@/lib/db";
 import { canManage, listMemberships, requireActiveOrg, requireProject, requireUser } from "@/lib/dal";
 
@@ -208,7 +210,11 @@ export async function updateAssistantSettings(projectId: string, _: ActionState,
       blockedPaths: lines(text(formData, "blockedPaths")),
       confirmKeywords: lines(text(formData, "confirmKeywords")),
     },
-    data: { ...current.data, retentionDays: Number(text(formData, "retentionDays")) || current.data.retentionDays },
+    data: {
+      ...current.data,
+      retentionDays: Number(text(formData, "retentionDays")) || current.data.retentionDays,
+      weeklyDigest: formData.get("weeklyDigest") === "on",
+    },
     proactive: {
       enabled: formData.get("proactiveEnabled") === "on",
       stuckSeconds: Number(text(formData, "stuckSeconds")) || current.proactive.stuckSeconds,
@@ -357,4 +363,12 @@ export async function moveOnboardingStep(projectId: string, stepId: string) {
     if (i > 0) [steps[i - 1], steps[i]] = [steps[i]!, steps[i - 1]!];
     return { ...o, steps };
   });
+}
+
+export async function sendDigestPreview(projectId: string): Promise<ActionState> {
+  const { user } = await requireProject(projectId);
+  const digest = await buildDigest(projectId);
+  if (!digest) return { error: "No conversations in the last 7 days, so there's nothing to summarise yet." };
+  await sendEmail({ to: user.email, ...digest });
+  return { ok: `Sent to ${user.email}.` };
 }

@@ -71,6 +71,9 @@ export default async function ConversationsPage({ params, searchParams }: PagePr
         {chip("👍 Helpful", withParams({ rating: "up" }), rating === 1)}
         {chip("👎 Not helpful", withParams({ rating: "down" }), rating === -1)}
         {topicRow && chip(`Topic: ${topicRow.label} ✕`, withParams({ topic: undefined }), true)}
+        <a href={`${base}/export?days=${days}`} className="px-2 py-1 text-xs text-brand-ink">
+          Download CSV
+        </a>
       </div>
     </div>
     <Card title="Conversations" description="What your users asked Clicky, newest first.">

@@ -18,6 +18,7 @@ import {
   type SessionState,
 } from "./storage";
 import { mountWidget, type MessageHandle, type Widget } from "./widget";
+import { t, type MessageKey } from "./i18n";
 
 export interface Caller {
   projectKey: string;
@@ -25,10 +26,10 @@ export interface Caller {
   user: { userId: string; traits?: Record<string, string | number | boolean | null> } | null;
 }
 
-const ERROR_TEXT: Record<string, string> = {
-  rate_limited: "You're asking faster than I can keep up. Give me a moment and try again.",
-  origin_not_allowed: "I'm not set up for this website yet.",
-  unknown_run: "I lost track of that task. Could you ask again?",
+const ERROR_TEXT: Record<string, MessageKey> = {
+  rate_limited: "rateLimited",
+  origin_not_allowed: "notSetUp",
+  unknown_run: "lostTask",
 };
 
 const YES_RE = /\b(yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|confirm|allow|go for it)\b/i;
@@ -133,14 +134,8 @@ export class Assistant {
     }
     this.nudgesShown++;
     const name = element.match(/"([^"]+)"/)?.[1];
-    const text =
-      kind === "rage_click"
-        ? `Is ${name ? `“${name}”` : "something"} not working? I can help.`
-        : "Stuck on this form? I can help you finish it.";
-    const question =
-      kind === "rage_click"
-        ? `I keep clicking ${name ? `"${name}"` : "here"} and nothing happens. What should I do?`
-        : "I'm having trouble with this form. Can you help me fill it in?";
+    const text = kind === "rage_click" ? (name ? t("nudgeRage", { name }) : t("nudgeRageGeneric")) : t("nudgeForm");
+    const question = kind === "rage_click" ? (name ? t("askRage", { name }) : t("askRageGeneric")) : t("askForm");
     this.recordEvent("nudge_shown", element || null);
     this.widget.showNudge(
       text,
@@ -165,14 +160,14 @@ export class Assistant {
       }
     }
     if (url.startsWith("mailto:")) {
-      const body = transcript ? `\n\n---\nMy conversation with ${this.config.appearance.assistantName}:\n${transcript}`.slice(0, 1800) : "";
-      location.href = `${url}?subject=${encodeURIComponent(`Help with ${location.hostname}`)}&body=${encodeURIComponent(body)}`;
+      const body = transcript ? `\n\n---\n${t("handoffBody", { name: this.config.appearance.assistantName })}\n${transcript}`.slice(0, 1800) : "";
+      location.href = `${url}?subject=${encodeURIComponent(t("handoffSubject", { host: location.hostname }))}&body=${encodeURIComponent(body)}`;
     } else {
       const target = new URL(url);
       if (conversationId) target.searchParams.set("clicky_conversation", conversationId);
       window.open(target.toString(), "_blank", "noopener");
     }
-    this.widget.addMessage("assistant", `Opening ${label}. I've passed this conversation along.`);
+    this.widget.addMessage("assistant", t("handoffOpening", { label }));
   }
 
   /** Stops whatever the assistant is doing. */
@@ -222,7 +217,7 @@ export class Assistant {
     } catch (error) {
       if (!turn.controller.signal.aborted) {
         const code = error instanceof ApiError ? error.code : "";
-        const text = ERROR_TEXT[code] ?? "I couldn't reach the server. Check your connection and try again.";
+        const text = t(ERROR_TEXT[code] ?? "offline");
         this.widget.addMessage("assistant", text);
       }
     }
@@ -333,16 +328,16 @@ export class Assistant {
       }
       const blocked = blockedReason(action, this.config);
       if (blocked) {
-        row.setStatus("blocked", "Turned off on this page");
+        row.setStatus("blocked", t("blockedHere"));
         results.push({ id: action.id, status: "blocked", output: blocked });
         this.skipRest(actions, rows, results, i + 1, "Not run because an earlier step was blocked.");
         break;
       }
       if (needsConfirmation(action, ctx, RISKY_ACTION_RE)) {
-        row.setStatus("waiting", "Needs your OK");
+        row.setStatus("waiting", t("needsOk"));
         const target = action.input.ref ? ctx.refs.get(action.input.ref) : undefined;
         if (target?.isConnected) this.widget.pointer.pointAt(target, 120_000);
-        const question = `Should I ${action.input.description.charAt(0).toLowerCase()}${action.input.description.slice(1)}?`;
+        const question = t("confirm", { action: `${action.input.description.charAt(0).toLowerCase()}${action.input.description.slice(1)}` });
         this.widget.setStatus("idle", "");
         if (turn.speaker) {
           turn.spoke = true;
@@ -460,18 +455,18 @@ export class Assistant {
     else this.speaker?.stop();
     this.widget.open();
     if (!this.listener) {
-      this.widget.setStatus("idle", "Voice isn't available in this browser. Type your question instead.");
+      this.widget.setStatus("idle", t("voiceUnavailable"));
       return;
     }
     this.widget.setStatus("listening");
     const listener = this.listener;
     this.listening = listener
-      .start((partial) => this.widget.setStatus("listening", partial || "Listening…"))
+      .start((partial) => this.widget.setStatus("listening", partial || t("listening")))
       .catch((error: unknown) => {
         const denied = error instanceof DOMException && error.name === "NotAllowedError";
         this.widget.setStatus(
           "idle",
-          denied ? "Microphone access is blocked. Allow it in your browser to talk to me." : "I couldn't start listening.",
+          denied ? t("micBlocked") : t("micFailed"),
         );
         this.listening = null;
         throw error;
@@ -493,7 +488,7 @@ export class Assistant {
       if (NO_RE.test(text)) return this.confirmByVoice(false);
     }
     if (text) void this.ask(text, "voice");
-    else this.widget.setStatus("idle", "I didn't catch that. Hold the key while you talk.");
+    else this.widget.setStatus("idle", t("didntCatch"));
   }
 
   private setMuted(muted: boolean) {

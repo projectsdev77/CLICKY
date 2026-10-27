@@ -60,6 +60,7 @@ The SDK sends lightweight signals (page views, rage clicks, dead clicks, form er
 
 - `GET /api/health`: 200 when the app and database are up (for uptime monitors).
 - `GET /api/cron/retention`: deletes conversations and signals past each project's retention period (default 90 days). Scheduled daily in `vercel.json`; needs `CRON_SECRET`.
+- `GET /api/cron/digest`: weekly insight email to owners and admins (Mondays, `vercel.json`; needs `CRON_SECRET`).
 - Privacy requests: project Settings → "Delete a user's data".
 
 ## Common commands

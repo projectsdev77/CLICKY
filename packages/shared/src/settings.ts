@@ -80,6 +80,8 @@ export const onboardingSchema = z.object({
 export const dataSchema = z.object({
   /** Conversations and signals older than this are deleted automatically. */
   retentionDays: z.number().int().min(7).max(730).default(90),
+  /** Email a weekly summary to the organization's owners and admins. */
+  weeklyDigest: z.boolean().default(true),
 });
 
 export const projectSettingsSchema = z.object({

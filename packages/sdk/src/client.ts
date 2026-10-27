@@ -5,6 +5,7 @@ import type { AppActionHandler } from "./agent/app-actions";
 import { postQuietly } from "./api";
 import { SignalTracker } from "./signals";
 import { Onboarding } from "./onboarding";
+import { t } from "./i18n";
 import type { OnboardingState } from "@clicky/shared";
 
 export interface InitOptions {
@@ -113,7 +114,7 @@ export class ClickyClient {
       this.onboarding = new Onboarding(state, assistant.widget, {
         storageKey: `clicky:onboarding:${projectKey}`,
         complete: (stepId) => postQuietly(`${base}/api/v1/onboarding/complete`, { ...this.caller(), stepId }),
-        showMe: (title) => void assistant.ask(`Show me how to ${title.charAt(0).toLowerCase()}${title.slice(1)}`, "text"),
+        showMe: (title) => void assistant.ask(t("showMeAsk", { step: `${title.charAt(0).toLowerCase()}${title.slice(1)}` }), "text"),
       });
     } catch {
       // onboarding is optional; never break the host app

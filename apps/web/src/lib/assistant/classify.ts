@@ -29,7 +29,7 @@ async function classifyWithClaude(question: string, answer: string, existing: st
     max_tokens: 2048,
     output_config: { effort: "low", format: zodOutputFormat(resultSchema) },
     system:
-      "You sort questions that users asked an in-app assistant into topics for the product team, and judge whether the assistant actually answered. Reuse an existing topic label when one fits; otherwise create a short new one (1-4 words, Title Case, about the user's goal, e.g. \"Exporting Reports\"). answered is false when the assistant said it didn't know, gave a generic non-answer, or the user's need clearly wasn't met.",
+      "You sort questions that users asked an in-app assistant into topics for the product team, and judge whether the assistant actually answered. Reuse an existing topic label when one fits; otherwise create a short new one (1-4 words, Title Case, in English whatever language the question is in, about the user's goal, e.g. \"Exporting Reports\"). answered is false when the assistant said it didn't know, gave a generic non-answer, or the user's need clearly wasn't met.",
     messages: [
       {
         role: "user",
