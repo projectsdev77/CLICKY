@@ -25,7 +25,7 @@ export default async function OverviewPage({ params, searchParams }: PageProps<"
   if (o.conversations === 0 && o.previousConversations === 0) {
     return (
       <Card title="No conversations yet" description="Once people start asking Clicky questions, you'll see what they ask about and where they get stuck here.">
-        <Link href={`${base}/install`} className="text-sm text-brand">
+        <Link href={`${base}/install`} className="text-sm text-brand-ink">
           Check your installation →
         </Link>
       </Card>

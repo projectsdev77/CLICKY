@@ -51,7 +51,7 @@ export default async function ConversationsPage({ params, searchParams }: PagePr
   const chip = (label: string, href: string, active: boolean) => (
     <Link
       href={href}
-      className={`rounded-full border px-3 py-1 text-xs ${active ? "border-brand text-brand" : "border-border text-muted hover:text-foreground"}`}
+      className={`rounded-full border px-3 py-1 text-xs ${active ? "border-brand text-brand-ink" : "border-border text-muted hover:text-foreground"}`}
     >
       {label}
     </Link>

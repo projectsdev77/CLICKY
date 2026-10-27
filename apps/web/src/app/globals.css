@@ -4,9 +4,11 @@
   --background: #fafafa;
   --foreground: #18181b;
   --card: #ffffff;
-  --muted: #71717a;
+  --muted: #62626b;
   --border: #e4e4e7;
   --brand: #6d28d9;
+  /* Brand-colored text (links, labels): kept separate so both fills and text meet contrast in each mode. */
+  --brand-ink: #6d28d9;
   /* Charts: validated single-series hue (dataviz reference palette, slot 1) */
   --chart-1: #2a78d6;
   --grid: #ececea;
@@ -19,7 +21,8 @@
     --card: #18181b;
     --muted: #a1a1aa;
     --border: #27272a;
-    --brand: #8b5cf6;
+    --brand: #7c3aed;
+    --brand-ink: #a78bfa;
     --chart-1: #3987e5;
     --grid: #2a2a28;
   }
@@ -32,6 +35,7 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
   --color-chart-1: var(--chart-1);
   --color-grid: var(--grid);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

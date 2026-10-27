@@ -6,7 +6,7 @@ export function CopyBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-md border border-border bg-background p-3 pr-16 font-mono text-xs leading-relaxed">
+      <pre tabIndex={0} className="overflow-x-auto rounded-md border border-border bg-background p-3 pr-16 font-mono text-xs leading-relaxed">
         {code}
       </pre>
       <button

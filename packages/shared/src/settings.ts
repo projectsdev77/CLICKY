@@ -31,10 +31,16 @@ export const maskingSchema = z.object({
   selectors: z.array(z.string()).default([]),
 });
 
+export const dataSchema = z.object({
+  /** Conversations and signals older than this are deleted automatically. */
+  retentionDays: z.number().int().min(7).max(730).default(90),
+});
+
 export const projectSettingsSchema = z.object({
   appearance: appearanceSchema.prefault({}),
   behavior: behaviorSchema.prefault({}),
   masking: maskingSchema.prefault({}),
+  data: dataSchema.prefault({}),
 });
 
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;

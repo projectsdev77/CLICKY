@@ -1,6 +1,8 @@
 import "server-only";
+import { lookup as dnsLookup } from "node:dns";
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
+import { Agent, fetch as undiciFetch } from "undici";
 
 /**
  * Fetches a customer-supplied URL without letting it reach our own network
@@ -26,9 +28,31 @@ function isPrivateAddress(ip: string): boolean {
   );
 }
 
+const allowPrivate = () => process.env.CLICKY_ALLOW_PRIVATE_FETCH === "1";
+
+/**
+ * DNS lookup used for the actual connection. Checking the address once up front
+ * isn't enough (DNS rebinding: a hostname can resolve to a public address for the
+ * check and a private one for the request), so every connection is checked here.
+ */
+const guardedLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, { ...options, all: true }, (error, addresses) => {
+    if (error) return callback(error, "", 4);
+    const list = addresses as unknown as { address: string; family: number }[];
+    if (!allowPrivate() && list.some((a) => isPrivateAddress(a.address))) {
+      return callback(new Error("That address isn't publicly reachable"), "", 4);
+    }
+    if (options.all) return (callback as unknown as (e: null, a: typeof list) => void)(null, list);
+    callback(null, list[0]!.address, list[0]!.family);
+  });
+};
+
+const dispatcher = new Agent({ connect: { lookup: guardedLookup } });
+
 async function assertPublicUrl(url: URL) {
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Only http and https links are supported");
-  if (process.env.CLICKY_ALLOW_PRIVATE_FETCH === "1") return; // local development against localhost sites
+  if (allowPrivate()) return; // local development against localhost sites
+  if (isIP(url.hostname) && isPrivateAddress(url.hostname)) throw new Error("That address isn't publicly reachable");
   const addresses = await lookup(url.hostname, { all: true });
   if (addresses.length === 0 || addresses.some((a) => isPrivateAddress(a.address))) {
     throw new Error("That address isn't publicly reachable");
@@ -41,7 +65,8 @@ export async function safeFetchHtml(input: string): Promise<{ url: string; html:
   let url = new URL(input);
   for (let redirects = 0; redirects <= 3; redirects++) {
     await assertPublicUrl(url);
-    const res = await fetch(url, {
+    const res = await undiciFetch(url, {
+      dispatcher,
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
       headers: { "User-Agent": "ClickyBot/0.1 (+knowledge sync)", Accept: "text/html" },

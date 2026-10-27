@@ -40,7 +40,7 @@ export default function SecurityPage() {
       <h2>Compliance</h2>
       <p>
         Clicky is not yet SOC 2 certified. We&apos;re building toward it, and a data processing agreement is available on request.
-        Report security issues to <a className="text-brand" href="mailto:security@clicky.local">security@clicky.local</a>.
+        Report security issues to <a className="text-brand-ink" href="mailto:security@clicky.local">security@clicky.local</a>.
       </p>
     </Prose>
   );

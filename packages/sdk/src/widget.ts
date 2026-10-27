@@ -52,7 +52,7 @@ export interface Widget {
 const STYLES = /* css */ `
   :host { all: initial; }
   * { box-sizing: border-box; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .light { --bg: #fff; --fg: #18181b; --muted: #71717a; --border: #e4e4e7; --soft: #f4f4f5; }
+  .light { --bg: #fff; --fg: #18181b; --muted: #5f5f68; --border: #e4e4e7; --soft: #f4f4f5; }
   .dark { --bg: #18181b; --fg: #fafafa; --muted: #a1a1aa; --border: #3f3f46; --soft: #27272a; }
   .root { position: fixed; bottom: 20px; z-index: 2147483000; display: flex; flex-direction: column; gap: 12px; }
   .root.right { right: 20px; align-items: flex-end; }
@@ -90,7 +90,7 @@ const STYLES = /* css */ `
 
   .log { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 120px; }
   .msg { max-width: 88%; padding: 8px 12px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; }
-  .msg.user { align-self: flex-end; background: var(--brand); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.user { align-self: flex-end; background: var(--brand); color: var(--on-brand); border-bottom-right-radius: 4px; }
   .msg.assistant { align-self: flex-start; background: var(--soft); border-bottom-left-radius: 4px; }
   .msg.assistant:empty::after { content: "…"; color: var(--muted); }
   .greeting { color: var(--muted); }
@@ -106,7 +106,7 @@ const STYLES = /* css */ `
   .mic { background: var(--soft); color: var(--fg); }
   [data-status=listening] .mic { background: #ef4444; color: #fff; }
   .mic[hidden] { display: none; }
-  .send { background: var(--brand); color: #fff; }
+  .send { background: var(--brand); color: var(--on-brand); }
   .hint { padding: 0 14px 10px; color: var(--muted); font-size: 12px; }
   .steps { align-self: stretch; list-style: none; margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
   .step { display: flex; gap: 8px; align-items: baseline; }
@@ -118,7 +118,7 @@ const STYLES = /* css */ `
   .confirm { align-self: stretch; border: 1px solid var(--brand); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .confirm .actions { display: flex; gap: 8px; }
   .confirm button { border-radius: 8px; padding: 6px 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); }
-  .confirm button.allow { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .confirm button.allow { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
   .confirm.answered { opacity: .7; }
   .feedback { align-self: flex-start; display: flex; gap: 4px; align-items: center; color: var(--muted); font-size: 12px; margin-top: -4px; }
   .feedback button { border: 0; background: transparent; padding: 2px 6px; border-radius: 6px; font-size: 14px; color: var(--muted); }
@@ -146,6 +146,16 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, h
   return node;
 }
 
+/** White or near-black, whichever reads better on the customer's brand color (WCAG contrast). */
+export function textOnColor(hex: string): string {
+  const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const [r, g, b] = channels.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)) as [number, number, number];
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const onWhite = 1.05 / (luminance + 0.05);
+  const onDark = (luminance + 0.05) / (0.0137 + 0.05); // #18181b
+  return onWhite >= onDark ? "#ffffff" : "#18181b";
+}
+
 function resolveTheme(theme: SdkInitResponse["appearance"]["theme"]) {
   if (theme !== "auto") return theme;
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -166,6 +176,7 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   const wrapper = el("div", theme);
   wrapper.dataset.status = "idle";
   wrapper.style.setProperty("--brand", appearance.brandColor);
+  wrapper.style.setProperty("--on-brand", textOnColor(appearance.brandColor));
   const root = el("div", `root ${appearance.position === "bottom-left" ? "left" : "right"}`);
 
   // Panel

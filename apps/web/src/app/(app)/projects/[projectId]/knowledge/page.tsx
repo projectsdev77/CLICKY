@@ -83,7 +83,7 @@ export default async function KnowledgePage({ params, searchParams }: PageProps<
                 {manage && (
                   <Link
                     href={`/projects/${project.id}/knowledge?question=${encodeURIComponent(g.content)}#article`}
-                    className="text-xs text-brand"
+                    className="text-xs text-brand-ink"
                   >
                     Write an answer
                   </Link>

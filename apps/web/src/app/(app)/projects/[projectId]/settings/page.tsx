@@ -2,7 +2,7 @@ import { canManage, requireProject } from "@/lib/dal";
 import { Card } from "@/components/ui";
 import { CopyBlock } from "@/components/copy-block";
 import { parseProjectSettings } from "@clicky/shared";
-import { AssistantForm, DangerZone, RenameForm } from "./settings-forms";
+import { AssistantForm, DangerZone, DeleteUserForm, RenameForm } from "./settings-forms";
 
 export default async function SettingsPage({ params }: PageProps<"/projects/[projectId]/settings">) {
   const { projectId } = await params;
@@ -23,6 +23,14 @@ export default async function SettingsPage({ params }: PageProps<"/projects/[pro
       >
         <CopyBlock code={project.publicKey} />
       </Card>
+      {manage && (
+        <Card
+          title="Delete a user's data"
+          description="For privacy requests: removes every conversation and signal for a user id you passed to Clicky.identify()."
+        >
+          <DeleteUserForm projectId={project.id} />
+        </Card>
+      )}
       {manage && (
         <Card title="Danger zone">
           <DangerZone projectId={project.id} />

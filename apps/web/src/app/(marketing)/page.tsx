@@ -65,7 +65,7 @@ export default function Home() {
               ["Users just ask", "They hold Alt+Space and talk. Clicky answers, points, or does it for them."],
             ].map(([title, body], i) => (
               <li key={title}>
-                <span className="text-sm font-medium text-brand">Step {i + 1}</span>
+                <span className="text-sm font-medium text-brand-ink">Step {i + 1}</span>
                 <h3 className="mt-1 font-semibold">{title}</h3>
                 <p className="mt-1 text-sm text-muted">{body}</p>
               </li>
@@ -125,7 +125,7 @@ function ProductMock() {
           <div className="h-7 w-20 rounded border border-border" />
           <div className="relative rounded-md border border-border px-3 py-1 text-xs ring-4 ring-brand/30 outline outline-2 outline-brand">
             Export
-            <svg className="absolute -bottom-4 -right-3 h-6 w-6 text-brand" viewBox="0 0 24 24">
+            <svg className="absolute -bottom-4 -right-3 h-6 w-6 text-brand-ink" viewBox="0 0 24 24">
               <path fill="currentColor" stroke="#fff" strokeWidth="1.5" d="M4 3l7.5 18 2.6-7.4L21.5 11z" />
             </svg>
           </div>

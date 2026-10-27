@@ -91,11 +91,11 @@ export function AuthForm({ mode, googleEnabled }: { mode: "sign-in" | "sign-up";
       <p className="text-center text-sm text-muted">
         {mode === "sign-up" ? (
           <>
-            Already have an account? <Link className="text-brand" href={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link>
+            Already have an account? <Link className="text-brand-ink" href={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link>
           </>
         ) : (
           <>
-            New to Clicky? <Link className="text-brand" href={`/sign-up?next=${encodeURIComponent(next)}`}>Create an account</Link>
+            New to Clicky? <Link className="text-brand-ink" href={`/sign-up?next=${encodeURIComponent(next)}`}>Create an account</Link>
           </>
         )}
       </p>

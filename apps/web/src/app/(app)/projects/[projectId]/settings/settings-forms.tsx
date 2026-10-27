@@ -2,14 +2,14 @@
 
 import { useActionState } from "react";
 import type { ProjectSettings } from "@clicky/shared";
-import { deleteProject, renameProject, rotateProjectKey, updateAssistantSettings } from "@/app/actions";
+import { deleteProject, deleteUserData, renameProject, rotateProjectKey, updateAssistantSettings } from "@/app/actions";
 import { Button, Field, FormMessage, Input, Textarea } from "@/components/ui";
 
 export function RenameForm({ projectId, name, disabled }: { projectId: string; name: string; disabled: boolean }) {
   const [state, action, pending] = useActionState(renameProject.bind(null, projectId), null);
   return (
     <form action={action} className="flex flex-wrap items-center gap-3">
-      <Input name="name" defaultValue={name} required disabled={disabled} className="max-w-xs" />
+      <Input name="name" aria-label="Project name" defaultValue={name} required disabled={disabled} className="max-w-xs" />
       <Button type="submit" disabled={pending || disabled}>
         Save
       </Button>
@@ -99,6 +99,13 @@ export function AssistantForm({
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input type="checkbox" name="voiceEnabled" defaultChecked={behavior.voiceEnabled} /> Voice (talk and listen)
         </label>
+        <Field label="Keep conversations and signals for">
+          <select name="retentionDays" defaultValue={String(settings.data.retentionDays)} className={selectClass}>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+            <option value="365">1 year</option>
+          </select>
+        </Field>
         <label className="flex items-center gap-2 text-sm sm:col-span-2">
           <input type="checkbox" name="trackSignals" defaultChecked={behavior.trackSignals} /> Collect page views and
           struggle signals for the Friction page (never field values)
@@ -121,6 +128,25 @@ export function AssistantForm({
         </Button>
         <FormMessage state={state} />
       </div>
+    </form>
+  );
+}
+
+export function DeleteUserForm({ projectId }: { projectId: string }) {
+  const [state, action, pending] = useActionState(deleteUserData.bind(null, projectId), null);
+  return (
+    <form
+      action={action}
+      onSubmit={(e) => {
+        if (!confirm("Delete all of this user's conversations and signals? This can't be undone.")) e.preventDefault();
+      }}
+      className="flex flex-wrap items-center gap-3"
+    >
+      <Input name="userId" aria-label="User id" placeholder="user_1234" className="max-w-xs" required />
+      <Button type="submit" variant="secondary" disabled={pending}>
+        Delete user data
+      </Button>
+      <FormMessage state={state} />
     </form>
   );
 }

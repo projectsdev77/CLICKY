@@ -21,7 +21,7 @@ function Reply({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <span key={i} className="mx-0.5 rounded bg-brand/10 px-1 font-mono text-[10px] text-brand" title="Pointed at this element">
+          <span key={i} className="mx-0.5 rounded bg-brand/10 px-1 font-mono text-[10px] text-brand-ink" title="Pointed at this element">
             ➜ {part}
           </span>
         ) : (

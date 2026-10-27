@@ -107,13 +107,13 @@ export default async function BillingPage({ searchParams }: PageProps<"/billing"
                   </form>
                 </div>
               )}
-              {current && <p className="mt-4 text-sm font-medium text-brand">Your current plan</p>}
+              {current && <p className="mt-4 text-sm font-medium text-brand-ink">Your current plan</p>}
             </Card>
           );
         })}
       </div>
       <p className="text-sm text-muted">
-        Need more, SSO or a DPA? <a className="text-brand" href="mailto:sales@clicky.local">Talk to us about Enterprise</a>.
+        Need more, SSO or a DPA? <a className="text-brand-ink" href="mailto:sales@clicky.local">Talk to us about Enterprise</a>.
       </p>
 
       {manage && devBilling && (

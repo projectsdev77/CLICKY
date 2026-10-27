@@ -20,7 +20,7 @@ export function InstallStatus({ projectId, initial }: { projectId: string; initi
   if (status.lastSeenAt) {
     return (
       <div className="rounded-lg border border-green-600/30 bg-green-600/10 p-4 text-sm">
-        <p className="font-medium text-green-700 dark:text-green-400">Clicky is installed</p>
+        <p className="font-medium text-green-800 dark:text-green-400">Clicky is installed</p>
         <p className="mt-1 text-muted">
           Last seen {new Date(status.lastSeenAt).toLocaleString()}
           {status.lastSeenUrl && <> on {status.lastSeenUrl}</>}

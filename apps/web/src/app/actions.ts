@@ -9,6 +9,7 @@ import { defaultProjectSettings, generatePublicKey, normalizeOrigin, parseProjec
 import { auth } from "@/lib/auth";
 import { saveTextSource, syncUrlSource } from "@/lib/knowledge";
 import { getBillingState, startTrial } from "@/lib/billing";
+import { deleteEndUserData } from "@/lib/retention";
 import { db } from "@/lib/db";
 import { canManage, listMemberships, requireActiveOrg, requireProject, requireUser } from "@/lib/dal";
 
@@ -254,4 +255,15 @@ export async function deleteSource(projectId: string, sourceId: string) {
     .delete(knowledgeSource)
     .where(and(eq(knowledgeSource.id, sourceId), eq(knowledgeSource.projectId, projectId)));
   revalidatePath(`/projects/${projectId}/knowledge`);
+}
+
+export async function deleteUserData(projectId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  await requireProject(projectId, { manage: true });
+  const userId = text(formData, "userId");
+  if (!userId) return { error: "Enter the user id your app passes to Clicky.identify()." };
+  const deleted = await deleteEndUserData(projectId, userId);
+  revalidatePath(`/projects/${projectId}`, "layout");
+  return deleted
+    ? { ok: `Deleted everything Clicky had for ${userId}.` }
+    : { error: `No data found for ${userId}. (Anonymous visitors can't be looked up by id.)` };
 }

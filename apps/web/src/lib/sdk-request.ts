@@ -44,9 +44,40 @@ export function sdkErrorResponse(error: unknown, origin: string | null) {
   return NextResponse.json({ error: "internal_error" }, { status: 500, headers: corsHeaders(origin) });
 }
 
-/** Parses the JSON body against `schema` or throws a 400. */
+/** Largest request body we accept from the SDK (a page snapshot is capped well below this). */
+const MAX_BODY_BYTES = 128 * 1024;
+
+/** Reads at most `limit` bytes of the body, so an oversized request can't exhaust memory. */
+async function readLimited(request: Request, limit: number): Promise<string> {
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared > limit) throw new SdkError("payload_too_large", 413);
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      throw new SdkError("payload_too_large", 413);
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+/** Parses the JSON body against `schema` or throws a 400 (413 if too large). */
 export async function parseBody<S extends z.ZodType>(request: Request, schema: S): Promise<z.infer<S>> {
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  const text = await readLimited(request, MAX_BODY_BYTES);
+  let json: unknown = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // fall through to the schema error
+  }
+  const parsed = schema.safeParse(json);
   if (!parsed.success) throw new SdkError("invalid_request", 400);
   return parsed.data;
 }

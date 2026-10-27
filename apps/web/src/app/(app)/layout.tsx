@@ -59,7 +59,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <p className="px-2 text-xs text-muted">Trial ends {billing.trialEndsAt.toLocaleDateString()}</p>
           )}
           {billing.status === "trial_ended" && (
-            <Link href="/billing" className="block px-2 text-xs text-brand">
+            <Link href="/billing" className="block px-2 text-xs text-brand-ink">
               Trial ended: upgrade
             </Link>
           )}
