@@ -1,3 +1,5 @@
+import type { ActionResult, AgentAction } from "@clicky/shared";
+
 /** Small wrappers around web storage that never throw (private mode, blocked storage, etc.). */
 
 function safeGet(storage: () => Storage, key: string): string | null {
@@ -55,4 +57,38 @@ export function loadSession(): SessionState {
 
 export function saveSession(state: SessionState) {
   safeSet(() => sessionStorage, SESSION_KEY, JSON.stringify({ ...state, messages: state.messages.slice(-30) }));
+}
+
+
+/** An agent run that was mid-action when the page navigated away; picked up on the next page load. */
+export interface PendingRun {
+  runId: string;
+  conversationId: string | null;
+  inputMode: "voice" | "text";
+  actions: AgentAction[];
+  index: number;
+  results: ActionResult[];
+  at: number;
+}
+
+const RUN_KEY = "clicky:run";
+
+export function savePendingRun(run: PendingRun) {
+  safeSet(() => sessionStorage, RUN_KEY, JSON.stringify(run));
+}
+
+export function takePendingRun(): PendingRun | null {
+  const raw = safeGet(() => sessionStorage, RUN_KEY);
+  safeSet(() => sessionStorage, RUN_KEY, null);
+  if (!raw) return null;
+  try {
+    const run = JSON.parse(raw) as PendingRun;
+    return Date.now() - run.at < 60_000 ? run : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingRun() {
+  safeSet(() => sessionStorage, RUN_KEY, null);
 }

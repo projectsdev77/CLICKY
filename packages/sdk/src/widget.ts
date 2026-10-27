@@ -13,8 +13,19 @@ export interface WidgetHandlers {
 
 export interface MessageHandle {
   append(text: string): void;
+  remove(): void;
   setText(text: string): void;
   get text(): string;
+}
+
+export type StepStatus = "pending" | "running" | "waiting" | "done" | "failed" | "declined" | "blocked" | "skipped" | "timeout";
+
+export interface StepRow {
+  setStatus(status: StepStatus, note?: string): void;
+}
+
+export interface StepsHandle {
+  add(description: string): StepRow;
 }
 
 export interface Widget {
@@ -27,6 +38,12 @@ export interface Widget {
   setStatus(status: WidgetStatus, caption?: string): void;
   setMuted(muted: boolean): void;
   setVoiceAvailable(available: boolean): void;
+  /** A list of agent steps, shown in the conversation. */
+  addSteps(): StepsHandle;
+  /** Asks the user to approve a step. `result` resolves true (Allow) or false (Don't); `answer` settles it from elsewhere (voice). */
+  confirm(question: string): { result: Promise<boolean>; answer(value: boolean): void };
+  /** Shows a Stop button while an agent run is in progress (null hides it). */
+  setRunning(onStop: (() => void) | null): void;
   destroy(): void;
 }
 
@@ -89,6 +106,20 @@ const STYLES = /* css */ `
   .mic[hidden] { display: none; }
   .send { background: var(--brand); color: #fff; }
   .hint { padding: 0 14px 10px; color: var(--muted); font-size: 12px; }
+  .steps { align-self: stretch; list-style: none; margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+  .step { display: flex; gap: 8px; align-items: baseline; }
+  .step .icon { width: 14px; flex: none; text-align: center; color: var(--muted); }
+  .step[data-status=running] .icon, .step[data-status=waiting] .icon { color: var(--brand); }
+  .step[data-status=done] .icon { color: #16a34a; }
+  .step[data-status=failed] .icon, .step[data-status=blocked] .icon, .step[data-status=timeout] .icon { color: #dc2626; }
+  .step .note { display: block; color: var(--muted); font-size: 12px; }
+  .confirm { align-self: stretch; border: 1px solid var(--brand); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .confirm .actions { display: flex; gap: 8px; }
+  .confirm button { border-radius: 8px; padding: 6px 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); }
+  .confirm button.allow { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .confirm.answered { opacity: .7; }
+  .stop { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 2px 10px; font-size: 12px; }
+  .stop[hidden] { display: none; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   @media (prefers-reduced-motion: reduce) { .launcher, .launcher::after { transition: none; animation: none !important; } }
   ${POINTER_STYLES}
@@ -148,7 +179,13 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
   const closeBtn = el("button", "icon-btn", ICONS.close);
   closeBtn.type = "button";
   closeBtn.setAttribute("aria-label", `Close ${appearance.assistantName}`);
-  header.append(dot, title, muteBtn, closeBtn);
+  const stopBtn = el("button", "stop");
+  stopBtn.type = "button";
+  stopBtn.textContent = "Stop";
+  stopBtn.hidden = true;
+  let onStop: (() => void) | null = null;
+  stopBtn.addEventListener("click", () => onStop?.());
+  header.append(dot, title, stopBtn, muteBtn, closeBtn);
 
   const log = el("div", "log");
   log.setAttribute("role", "log");
@@ -267,15 +304,103 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
         node.textContent = value;
         log.scrollTop = log.scrollHeight;
       },
+      remove() {
+        node.remove();
+      },
       get text() {
         return node.textContent ?? "";
       },
     };
   };
 
+  const STEP_ICONS: Record<StepStatus, string> = {
+    pending: "○",
+    running: "◐",
+    waiting: "☛",
+    done: "✓",
+    failed: "✕",
+    declined: "–",
+    blocked: "⊘",
+    skipped: "–",
+    timeout: "…",
+  };
+
+  const addSteps = (): StepsHandle => {
+    const list = el("ol", "steps");
+    list.setAttribute("aria-label", "Steps");
+    log.append(list);
+    return {
+      add(description) {
+        const row = el("li", "step");
+        const icon = el("span", "icon");
+        const body = el("span");
+        const text = el("span");
+        text.textContent = description;
+        const note = el("span", "note");
+        body.append(text, note);
+        row.append(icon, body);
+        list.append(row);
+        log.scrollTop = log.scrollHeight;
+        const handle: StepRow = {
+          setStatus(status, noteText) {
+            row.dataset.status = status;
+            icon.textContent = STEP_ICONS[status];
+            icon.setAttribute("aria-label", status);
+            note.textContent = noteText ?? "";
+            log.scrollTop = log.scrollHeight;
+          },
+        };
+        handle.setStatus("pending");
+        return handle;
+      },
+    };
+  };
+
+  const confirm = (question: string) => {
+    let answerFn: (value: boolean) => void = () => {};
+    const result = new Promise<boolean>((resolve) => {
+      const card = el("div", "confirm");
+      card.setAttribute("role", "group");
+      const text = el("div");
+      text.textContent = question;
+      const actions = el("div", "actions");
+      const allow = el("button", "allow");
+      allow.type = "button";
+      allow.textContent = "Allow";
+      const deny = el("button");
+      deny.type = "button";
+      deny.textContent = "Don't";
+      actions.append(allow, deny);
+      card.append(text, actions);
+      log.append(card);
+      log.scrollTop = log.scrollHeight;
+      setOpen(true);
+      allow.focus({ preventScroll: true });
+      let settled = false;
+      const answer = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        card.classList.add("answered");
+        allow.disabled = deny.disabled = true;
+        text.textContent = `${question} ${value ? "(allowed)" : "(declined)"}`;
+        resolve(value);
+      };
+      allow.addEventListener("click", () => answer(true), { once: true });
+      deny.addEventListener("click", () => answer(false), { once: true });
+      answerFn = answer;
+    });
+    return { result, answer: (value: boolean) => answerFn(value) };
+  };
+
   return {
     host,
     pointer,
+    addSteps,
+    confirm,
+    setRunning(handler) {
+      onStop = handler;
+      stopBtn.hidden = !handler;
+    },
     get isOpen() {
       return isOpen;
     },

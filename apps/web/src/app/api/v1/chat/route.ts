@@ -1,12 +1,14 @@
-import { and, conversation, desc, eq, message } from "@clicky/db";
-import { chatRequestSchema, parseProjectSettings, type ChatEvent } from "@clicky/shared";
+import type Anthropic from "@anthropic-ai/sdk";
+import { agentRun, and, conversation, desc, eq, message } from "@clicky/db";
+import { chatRequestSchema, isPathBlocked, parseProjectSettings } from "@clicky/shared";
 import { db } from "@/lib/db";
 import { searchKnowledge } from "@/lib/knowledge";
-import { streamReply } from "@/lib/assistant";
+import { buildSystemPrompt, buildUserTurn } from "@/lib/assistant/prompt";
+import { runStep } from "@/lib/assistant/run";
+import { sseResponse } from "@/lib/sse";
 import {
   authorizeProject,
   cleanUrl,
-  corsHeaders,
   enforceRateLimit,
   parseBody,
   preflight,
@@ -18,7 +20,7 @@ export const OPTIONS = preflight;
 
 const HISTORY_MESSAGES = 12;
 
-/** Answers one question about the current page, streaming the reply as server-sent events. */
+/** Answers a question about the current page (and, in agent mode, may start acting). Streams server-sent events. */
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   let setup;
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
         .returning();
     }
 
-    const [history, knowledge] = await Promise.all([
+    const [recent, knowledge] = await Promise.all([
       db
         .select({ role: message.role, content: message.content })
         .from(message)
@@ -61,6 +63,10 @@ export async function POST(request: Request) {
         .limit(HISTORY_MESSAGES),
       searchKnowledge(proj.id, body.message),
     ]);
+    // Earlier turns as plain text (no old page snapshots); must start with a user message.
+    const history = recent.reverse();
+    while (history[0]?.role === "assistant") history.shift();
+
     await db.insert(message).values({
       id: crypto.randomUUID(),
       conversationId: convo!.id,
@@ -69,72 +75,52 @@ export async function POST(request: Request) {
       inputMode: body.inputMode,
       pageUrl,
     });
-    setup = { body, proj, convo: convo!, history: history.reverse(), knowledge, pageUrl };
+    setup = { body, proj, convo: convo!, user, history, knowledge, pageUrl };
   } catch (error) {
     return sdkErrorResponse(error, origin);
   }
 
-  const { body, proj, convo, history, knowledge, pageUrl } = setup;
+  const { body, proj, convo, user, history, knowledge, pageUrl } = setup;
   const settings = parseProjectSettings(proj.settings);
-  const encoder = new TextEncoder();
+  const page = {
+    url: pageUrl,
+    title: body.page.title,
+    snapshot: body.page.snapshot,
+    actionsBlocked: isPathBlocked(settings.behavior.blockedPaths, new URL(pageUrl, "http://x").pathname),
+  };
+  const messages: Anthropic.Beta.BetaMessageParam[] = [
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+    { role: "user", content: buildUserTurn({ question: body.message, inputMode: body.inputMode, page, knowledge }) },
+  ];
+  const [run] = await db
+    .insert(agentRun)
+    .values({
+      id: crypto.randomUUID(),
+      conversationId: convo.id,
+      projectId: proj.id,
+      endUserId: user.id,
+      status: "running",
+      inputMode: body.inputMode,
+      messages: JSON.stringify(messages),
+    })
+    .returning();
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (event: ChatEvent) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-      send({ type: "meta", conversationId: convo.id });
-      let reply = "";
-      try {
-        const replyStream = streamReply({
-          prompt: {
-            assistantName: settings.appearance.assistantName,
-            appName: proj.name,
-            mode: settings.behavior.mode,
-            customInstructions: settings.behavior.customInstructions,
-          },
-          turn: {
-            question: body.message,
-            inputMode: body.inputMode,
-            pageUrl,
-            pageTitle: body.page.title,
-            snapshot: body.page.snapshot,
-            knowledge,
-          },
-          history,
-          signal: request.signal,
-        });
-        let next = await replyStream.next();
-        while (!next.done) {
-          reply += next.value;
-          send({ type: "text", delta: next.value });
-          next = await replyStream.next();
-        }
-        if (reply.trim()) {
-          await db.insert(message).values({
-            id: crypto.randomUUID(),
-            conversationId: convo.id,
-            role: "assistant",
-            content: reply,
-            pageUrl,
-            inputTokens: next.value.inputTokens,
-            outputTokens: next.value.outputTokens,
-          });
-        }
-        send({ type: "done" });
-      } catch (error) {
-        console.error("[chat] reply failed", error);
-        if (!request.signal.aborted) send({ type: "error", message: "Something went wrong. Please try again." });
-      } finally {
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      ...corsHeaders(origin),
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      "X-Accel-Buffering": "no",
-    },
+  return sseResponse(origin, async (send) => {
+    send({ type: "meta", conversationId: convo.id, runId: run!.id });
+    await runStep({
+      run: run!,
+      messages,
+      system: buildSystemPrompt({
+        assistantName: settings.appearance.assistantName,
+        appName: proj.name,
+        mode: settings.behavior.mode,
+        customInstructions: settings.behavior.customInstructions,
+      }),
+      mode: settings.behavior.mode,
+      pageUrl,
+      send,
+      signal: request.signal,
+      stub: { question: body.message, snapshot: body.page.snapshot, knowledge, lastResults: null },
+    });
   });
 }

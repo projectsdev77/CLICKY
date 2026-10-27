@@ -18,6 +18,14 @@ function text(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function lines(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 50);
+}
+
 function slugify(name: string) {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "org";
   return `${base}-${Math.random().toString(36).slice(2, 8)}`;
@@ -182,6 +190,8 @@ export async function updateAssistantSettings(projectId: string, _: ActionState,
       mode: text(formData, "mode"),
       voiceEnabled: formData.get("voiceEnabled") === "on",
       customInstructions: text(formData, "customInstructions"),
+      blockedPaths: lines(text(formData, "blockedPaths")),
+      confirmKeywords: lines(text(formData, "confirmKeywords")),
     },
   });
   if (!parsed.success) return { error: "Some values aren't valid. Check the name, color and instructions." };

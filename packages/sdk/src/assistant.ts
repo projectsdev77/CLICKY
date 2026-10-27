@@ -1,11 +1,21 @@
-import { MarkerParser, stripMarkers } from "@clicky/shared/client";
-import type { SdkInitResponse, VoiceTokenResponse } from "@clicky/shared";
+import { MarkerParser, RISKY_ACTION_RE, stripMarkers, type ActionResult, type AgentAction } from "@clicky/shared/client";
+import type { ChatEvent, SdkInitResponse, VoiceTokenResponse } from "@clicky/shared";
 import { ApiError, postEventStream, postJson } from "./api";
+import { blockedReason, executeAction, needsConfirmation, settle } from "./agent/executor";
 import { takeSnapshot, type PageSnapshot } from "./snapshot";
 import { createListener, type Listener } from "./speech/listen";
 import { createSpeaker, SentenceSplitter, type Speaker } from "./speech/speak";
-import { getAnonymousId, loadSession, saveSession, type SessionState } from "./storage";
-import { mountWidget, type Widget } from "./widget";
+import {
+  clearPendingRun,
+  getAnonymousId,
+  loadSession,
+  saveSession,
+  savePendingRun,
+  takePendingRun,
+  type PendingRun,
+  type SessionState,
+} from "./storage";
+import { mountWidget, type MessageHandle, type Widget } from "./widget";
 
 export interface Caller {
   projectKey: string;
@@ -16,13 +26,27 @@ export interface Caller {
 const ERROR_TEXT: Record<string, string> = {
   rate_limited: "You're asking faster than I can keep up. Give me a moment and try again.",
   origin_not_allowed: "I'm not set up for this website yet.",
+  unknown_run: "I lost track of that task. Could you ask again?",
 };
+
+const YES_RE = /\b(yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|confirm|allow|go for it)\b/i;
+const NO_RE = /\b(no|nope|don'?t|stop|cancel|wait|hold on)\b/i;
+
+/** State for one question and everything the assistant does to answer it. */
+interface Turn {
+  controller: AbortController;
+  inputMode: "voice" | "text";
+  speaker: Speaker | null;
+  spoke: boolean;
+  runId: string | null;
+}
 
 /**
  * Runs the assistant inside the page: takes questions (typed, or spoken via
- * push-to-talk), sends them with a snapshot of the page, streams the reply
- * into the panel, points at elements the reply mentions, and reads the reply
- * aloud when the question was spoken.
+ * push-to-talk), sends them with a snapshot of the page, streams the reply into
+ * the panel, points at what it mentions, reads replies aloud for spoken
+ * questions, and in agent mode carries out actions (asking first for risky
+ * ones) until the task is done.
  */
 export class Assistant {
   readonly widget: Widget;
@@ -30,8 +54,9 @@ export class Assistant {
   private listener: Listener | null;
   private speaker: Speaker | null;
   private listening: Promise<void> | null = null;
-  private inflight: AbortController | null = null;
+  private turn: Turn | null = null;
   private snapshot: PageSnapshot | null = null;
+  private confirmByVoice: ((yes: boolean) => void) | null = null;
   private teardown: (() => void)[] = [];
 
   constructor(
@@ -52,7 +77,7 @@ export class Assistant {
       onOpenChange: (open) => {
         this.session.open = open;
         this.save();
-        if (!open) this.stopSpeaking();
+        if (!open) this.speaker?.stop();
       },
     });
     this.widget.setVoiceAvailable(!!this.listener);
@@ -60,10 +85,13 @@ export class Assistant {
     for (const m of this.session.messages) this.widget.addMessage(m.role, m.text);
     if (this.session.open) this.widget.open();
     this.bindHotkey();
+
+    const pending = takePendingRun();
+    if (pending && pending.conversationId === this.session.conversationId) void this.resume(pending);
   }
 
   destroy() {
-    this.inflight?.abort();
+    this.turn?.controller.abort();
     this.listener?.cancel();
     this.speaker?.stop();
     this.teardown.forEach((fn) => fn());
@@ -72,84 +100,279 @@ export class Assistant {
 
   /** Asks a question about the current page. */
   async ask(question: string, inputMode: "voice" | "text") {
-    this.inflight?.abort();
-    this.stopSpeaking();
-    const controller = new AbortController();
-    this.inflight = controller;
-
-    this.widget.open();
+    const turn = this.beginTurn(inputMode);
     this.widget.addMessage("user", question);
     this.remember("user", question);
-    const bubble = this.widget.addMessage("assistant");
-    this.widget.setStatus("thinking");
-
     this.snapshot = takeSnapshot(this.config.masking);
-    const speak = inputMode === "voice" && !this.session.muted ? this.speaker : null;
+    const body = {
+      ...this.caller(),
+      conversationId: this.session.conversationId,
+      message: question,
+      inputMode,
+      page: this.page(),
+    };
+    await this.drive(turn, postEventStream(`${this.apiUrl}/api/v1/chat`, body, turn.controller.signal));
+  }
+
+  /** Stops whatever the assistant is doing. */
+  stop() {
+    this.turn?.controller.abort();
+    this.speaker?.stop();
+    this.widget.pointer.hide();
+  }
+
+  private beginTurn(inputMode: "voice" | "text"): Turn {
+    this.stop();
+    const turn: Turn = {
+      controller: new AbortController(),
+      inputMode,
+      speaker: inputMode === "voice" && !this.session.muted ? this.speaker : null,
+      spoke: false,
+      runId: null,
+    };
+    this.turn = turn;
+    this.widget.open();
+    this.widget.setStatus("thinking");
+    return turn;
+  }
+
+  /** Streams replies and carries out actions until the assistant is done (or the user stops it). */
+  private async drive(turn: Turn, firstStream: AsyncGenerator<ChatEvent>) {
+    let stream: AsyncGenerator<ChatEvent> | null = firstStream;
+    try {
+      while (stream) {
+        const actions = await this.readReply(turn, stream);
+        stream = null;
+        if (!actions || turn.controller.signal.aborted) break;
+        this.widget.setRunning(() => this.stop());
+        const results = await this.runActions(turn, actions);
+        if (turn.controller.signal.aborted) {
+          void this.cancelRun(turn.runId!, results);
+          break;
+        }
+        this.snapshot = takeSnapshot(this.config.masking);
+        this.widget.setStatus("thinking");
+        stream = postEventStream(
+          `${this.apiUrl}/api/v1/chat/continue`,
+          { ...this.caller(), runId: turn.runId, results, page: this.page() },
+          turn.controller.signal,
+        );
+      }
+    } catch (error) {
+      if (!turn.controller.signal.aborted) {
+        const code = error instanceof ApiError ? error.code : "";
+        const text = ERROR_TEXT[code] ?? "I couldn't reach the server. Check your connection and try again.";
+        this.widget.addMessage("assistant", text);
+      }
+    }
+    clearPendingRun();
+    if (this.turn !== turn) return;
+    this.widget.setRunning(null);
+    if (turn.speaker && turn.spoke && !turn.controller.signal.aborted) {
+      this.widget.setStatus("speaking", "");
+      await turn.speaker.drain();
+    }
+    if (this.turn === turn) {
+      this.turn = null;
+      if (!this.listening) this.widget.setStatus("idle");
+    }
+  }
+
+  /** Shows (and speaks) one streamed reply. Returns the actions the assistant asked for, if any. */
+  private async readReply(turn: Turn, stream: AsyncGenerator<ChatEvent>): Promise<AgentAction[] | null> {
+    const bubble = this.widget.addMessage("assistant");
     const parser = new MarkerParser();
     const splitter = new SentenceSplitter();
     const pendingPoints: string[] = [];
-    let spoke = false;
+    let actions: AgentAction[] | null = null;
 
-    const handleParts = (parts: ReturnType<MarkerParser["push"]>) => {
-      for (const part of parts) {
-        if (part.type === "point") {
-          // When speaking, point as the sentence that mentions it starts playing; otherwise point right away.
-          if (speak) pendingPoints.push(part.ref);
-          else this.pointAt(part.ref);
-          continue;
-        }
-        bubble.append(part.text);
-        if (speak) for (const sentence of splitter.push(part.text)) enqueue(sentence);
-      }
-    };
     const enqueue = (sentence: string) => {
       const refs = pendingPoints.splice(0);
-      spoke = true;
-      speak!.enqueue(sentence, () => {
+      turn.spoke = true;
+      turn.speaker!.enqueue(sentence, () => {
         this.widget.setStatus("speaking", "");
         refs.forEach((ref) => this.pointAt(ref));
       });
     };
+    const handle = (parts: ReturnType<MarkerParser["push"]>) => {
+      for (const part of parts) {
+        if (part.type === "point") {
+          // Spoken: point as the sentence that mentions it starts playing. Typed: point right away.
+          if (turn.speaker) pendingPoints.push(part.ref);
+          else this.pointAt(part.ref);
+          continue;
+        }
+        bubble.append(part.text);
+        if (turn.speaker) for (const sentence of splitter.push(part.text)) enqueue(sentence);
+      }
+    };
 
-    try {
-      const body = {
-        ...this.caller(),
+    for await (const event of stream) {
+      if (event.type === "meta") {
+        this.session.conversationId = event.conversationId;
+        turn.runId = event.runId;
+      } else if (event.type === "text") {
+        if (!turn.spoke) this.widget.setStatus("thinking", "");
+        handle(parser.push(event.delta));
+      } else if (event.type === "actions") {
+        turn.runId = event.runId;
+        actions = event.actions;
+      } else if (event.type === "error") {
+        bubble.setText(event.message);
+      }
+    }
+    handle(parser.end());
+    if (turn.speaker) {
+      for (const sentence of splitter.end()) enqueue(sentence);
+      pendingPoints.splice(0).forEach((ref) => this.pointAt(ref));
+    }
+    const text = stripMarkers(bubble.text).trim();
+    if (text) this.remember("assistant", text);
+    else bubble.remove();
+    return actions;
+  }
+
+  /** Carries out actions in order, asking first where needed. Stops at the first one that doesn't succeed. */
+  private async runActions(turn: Turn, actions: AgentAction[], startAt = 0, prior: ActionResult[] = []): Promise<ActionResult[]> {
+    const steps = this.widget.addSteps();
+    const rows = actions.map((a) => steps.add(a.input.description));
+    const results = [...prior];
+    prior.forEach((r, i) => rows[i]?.setStatus(r.status));
+    const signal = turn.controller.signal;
+    const ctx = {
+      refs: this.snapshot?.refs ?? new Map<string, Element>(),
+      pointer: this.widget.pointer,
+      config: this.config,
+      signal,
+    };
+
+    for (let i = startAt; i < actions.length; i++) {
+      const action = actions[i]!;
+      const row = rows[i]!;
+      const pending: PendingRun = {
+        runId: turn.runId!,
         conversationId: this.session.conversationId,
-        message: question,
-        inputMode,
-        page: { url: location.href, title: document.title.slice(0, 300), snapshot: this.snapshot.text },
+        inputMode: turn.inputMode,
+        actions,
+        index: i,
+        results: [...results],
+        at: Date.now(),
       };
-      for await (const event of postEventStream(`${this.apiUrl}/api/v1/chat`, body, controller.signal)) {
-        if (event.type === "meta") {
-          this.session.conversationId = event.conversationId;
-        } else if (event.type === "text") {
-          // Still working until the reply finishes; the caption gives way to the streaming text.
-          if (!spoke) this.widget.setStatus("thinking", "");
-          handleParts(parser.push(event.delta));
-        } else if (event.type === "error") {
-          bubble.setText(event.message);
+      if (signal.aborted) {
+        results.push({ id: action.id, status: "skipped", output: "Stopped by the user." });
+        row.setStatus("skipped");
+        continue;
+      }
+      const blocked = blockedReason(action, this.config);
+      if (blocked) {
+        row.setStatus("blocked", "Turned off on this page");
+        results.push({ id: action.id, status: "blocked", output: blocked });
+        this.skipRest(actions, rows, results, i + 1, "Not run because an earlier step was blocked.");
+        break;
+      }
+      if (needsConfirmation(action, ctx, RISKY_ACTION_RE)) {
+        row.setStatus("waiting", "Needs your OK");
+        const target = action.input.ref ? ctx.refs.get(action.input.ref) : undefined;
+        if (target?.isConnected) this.widget.pointer.pointAt(target, 120_000);
+        const question = `Should I ${action.input.description.charAt(0).toLowerCase()}${action.input.description.slice(1)}?`;
+        this.widget.setStatus("idle", "");
+        if (turn.speaker) {
+          turn.spoke = true;
+          turn.speaker.enqueue(question);
+        }
+        const allowed = await this.askToConfirm(question, signal);
+        if (!allowed) {
+          row.setStatus("declined");
+          results.push({ id: action.id, status: "declined", output: "The user said no to this step." });
+          this.skipRest(actions, rows, results, i + 1, "Not run because the user declined an earlier step.");
+          break;
         }
       }
-      handleParts(parser.end());
-      if (speak) {
-        for (const sentence of splitter.end()) enqueue(sentence);
-        pendingPoints.splice(0).forEach((ref) => this.pointAt(ref));
+      const teach = action.name === "wait_for_user";
+      row.setStatus(teach ? "waiting" : "running", teach ? action.input.instruction : undefined);
+      this.widget.setStatus("thinking", teach ? `Your turn: ${action.input.instruction}` : `${action.input.description}…`);
+      if (teach && turn.speaker && action.input.instruction) {
+        turn.spoke = true;
+        turn.speaker.enqueue(action.input.instruction);
       }
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      const code = error instanceof ApiError ? error.code : "";
-      bubble.setText(ERROR_TEXT[code] ?? "I couldn't reach the server. Check your connection and try again.");
-    } finally {
-      if (this.inflight === controller) this.inflight = null;
+      // If this step reloads the page, the next page load picks the run up from here.
+      savePendingRun(pending);
+      const result = await executeAction(action, ctx);
+      clearPendingRun();
+      row.setStatus(result.status, result.status === "done" ? undefined : result.output);
+      results.push(result);
+      if (result.status !== "done") {
+        this.skipRest(actions, rows, results, i + 1, "Not run because the previous step didn't work.");
+        break;
+      }
     }
+    return results;
+  }
 
-    const answer = stripMarkers(bubble.text).trim();
-    if (answer) this.remember("assistant", answer);
-    if (speak && spoke) {
-      this.widget.setStatus("speaking", "");
-      await speak.drain();
+  private skipRest(actions: AgentAction[], rows: { setStatus(s: "skipped"): void }[], results: ActionResult[], from: number, why: string) {
+    for (let j = from; j < actions.length; j++) {
+      results.push({ id: actions[j]!.id, status: "skipped", output: why });
+      rows[j]?.setStatus("skipped");
     }
-    if (!this.inflight && !this.listening) this.widget.setStatus("idle");
+  }
+
+  private askToConfirm(question: string, signal: AbortSignal): Promise<boolean> {
+    const { result, answer } = this.widget.confirm(question);
+    this.confirmByVoice = answer;
+    signal.addEventListener("abort", () => answer(false), { once: true });
+    return result.finally(() => {
+      if (this.confirmByVoice === answer) this.confirmByVoice = null;
+    });
+  }
+
+  /** Picks up a run that navigated to a new page mid-step. */
+  private async resume(pending: PendingRun) {
+    await settle(300, 2500);
+    const turn = this.beginTurn(pending.inputMode);
+    turn.runId = pending.runId;
+    const current = pending.actions[pending.index]!;
+    const results: ActionResult[] = [
+      ...pending.results,
+      {
+        id: current.id,
+        status: "done",
+        output: `${current.name === "wait_for_user" ? "The user did it." : `${current.input.description}: done.`} The page is now ${location.pathname}.`,
+      },
+    ];
+    for (const a of pending.actions.slice(pending.index + 1)) {
+      results.push({ id: a.id, status: "skipped", output: "Not run because the page changed." });
+    }
+    const steps = this.widget.addSteps();
+    pending.actions.forEach((a, i) => steps.add(a.input.description).setStatus(results[i]?.status ?? "skipped"));
+    this.snapshot = takeSnapshot(this.config.masking);
+    this.widget.setRunning(() => this.stop());
+    await this.drive(
+      turn,
+      postEventStream(
+        `${this.apiUrl}/api/v1/chat/continue`,
+        { ...this.caller(), runId: pending.runId, results, page: this.page() },
+        turn.controller.signal,
+      ),
+    );
+  }
+
+  private async cancelRun(runId: string, results: ActionResult[]) {
+    try {
+      const stream = postEventStream(
+        `${this.apiUrl}/api/v1/chat/continue`,
+        { ...this.caller(), runId, results, cancel: true, page: this.page() },
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // drain
+      }
+    } catch {
+      // best effort
+    }
+  }
+
+  private page() {
+    return { url: location.href, title: document.title.slice(0, 300), snapshot: this.snapshot?.text ?? "" };
   }
 
   private pointAt(ref: string) {
@@ -159,8 +382,9 @@ export class Assistant {
 
   private async startListening() {
     if (this.listening) return;
-    this.inflight?.abort();
-    this.stopSpeaking();
+    // While a step waits for approval, talking answers it instead of interrupting.
+    if (!this.confirmByVoice) this.stop();
+    else this.speaker?.stop();
     this.widget.open();
     if (!this.listener) {
       this.widget.setStatus("idle", "Voice isn't available in this browser. Type your question instead.");
@@ -191,13 +415,12 @@ export class Assistant {
     }
     const text = await this.listener.stop();
     this.listening = null;
+    if (this.confirmByVoice && text) {
+      if (YES_RE.test(text) && !NO_RE.test(text)) return this.confirmByVoice(true);
+      if (NO_RE.test(text)) return this.confirmByVoice(false);
+    }
     if (text) void this.ask(text, "voice");
     else this.widget.setStatus("idle", "I didn't catch that. Hold the key while you talk.");
-  }
-
-  private stopSpeaking() {
-    this.speaker?.stop();
-    this.widget.pointer.hide();
   }
 
   private setMuted(muted: boolean) {
@@ -264,3 +487,4 @@ export class Assistant {
 }
 
 export { getAnonymousId };
+export type { MessageHandle };

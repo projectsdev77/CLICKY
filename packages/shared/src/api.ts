@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ProjectSettings } from "./settings";
 import { MAX_QUESTION_CHARS, MAX_SNAPSHOT_CHARS } from "./limits";
+import type { AgentAction } from "./agent";
 
 export { MAX_QUESTION_CHARS, MAX_SNAPSHOT_CHARS };
 
@@ -19,7 +20,7 @@ export type TextToSpeechProvider = "elevenlabs" | "browser";
 export interface SdkInitResponse {
   projectId: string;
   appearance: ProjectSettings["appearance"];
-  behavior: Pick<ProjectSettings["behavior"], "mode" | "voiceEnabled">;
+  behavior: Pick<ProjectSettings["behavior"], "mode" | "voiceEnabled" | "blockedPaths" | "confirmKeywords">;
   masking: ProjectSettings["masking"];
   /** Which speech services the server can provide. "browser" means use the browser's built-in speech APIs. */
   voice: { stt: SpeechToTextProvider; tts: TextToSpeechProvider };
@@ -39,22 +40,44 @@ export const sdkCallerSchema = z.object({
 });
 
 
+const pageSchema = z.object({
+  url: z.string().max(2048),
+  title: z.string().max(300).default(""),
+  /** Redacted, LLM-friendly description of the page (see the SDK's snapshot module). */
+  snapshot: z.string().max(MAX_SNAPSHOT_CHARS),
+});
+
 export const chatRequestSchema = sdkCallerSchema.extend({
   conversationId: z.string().max(64).nullish(),
   message: z.string().trim().min(1).max(MAX_QUESTION_CHARS),
   inputMode: z.enum(["voice", "text"]).default("text"),
-  page: z.object({
-    url: z.string().max(2048),
-    title: z.string().max(300).default(""),
-    /** Redacted, LLM-friendly description of the page (see the SDK's snapshot module). */
-    snapshot: z.string().max(MAX_SNAPSHOT_CHARS),
-  }),
+  page: pageSchema,
 });
+
+/** Sent after the widget has carried out the actions from an `actions` event. */
+export const chatContinueRequestSchema = sdkCallerSchema.extend({
+  runId: z.string().max(64),
+  results: z
+    .array(
+      z.object({
+        id: z.string().max(128),
+        status: z.enum(["done", "failed", "declined", "blocked", "skipped", "timeout"]),
+        output: z.string().max(2000),
+      }),
+    )
+    .max(20),
+  /** The user pressed Stop: record it and end the run without calling the model. */
+  cancel: z.boolean().default(false),
+  page: pageSchema,
+});
+export type ChatContinueRequest = z.infer<typeof chatContinueRequestSchema>;
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 
 /** Server-sent events streamed back from POST /api/v1/chat. */
 export type ChatEvent =
-  | { type: "meta"; conversationId: string }
+  | { type: "meta"; conversationId: string; runId: string }
+  /** The assistant wants the widget to do these, in order, then call /chat/continue with the results. */
+  | { type: "actions"; runId: string; actions: AgentAction[] }
   | { type: "text"; delta: string }
   | { type: "done" }
   | { type: "error"; message: string };

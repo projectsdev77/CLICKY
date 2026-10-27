@@ -112,7 +112,7 @@ function roleOf(el: Element): string {
   return tag;
 }
 
-function isSensitive(el: Element, masking: Masking): boolean {
+export function isSensitive(el: Element, masking: Masking): boolean {
   if (el.closest("[data-clicky-mask]")) return true;
   for (const selector of masking.selectors) {
     try {

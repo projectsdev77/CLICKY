@@ -21,7 +21,12 @@ export async function POST(request: Request) {
     const response: SdkInitResponse = {
       projectId: row.id,
       appearance: settings.appearance,
-      behavior: { mode: settings.behavior.mode, voiceEnabled: settings.behavior.voiceEnabled },
+      behavior: {
+        mode: settings.behavior.mode,
+        voiceEnabled: settings.behavior.voiceEnabled,
+        blockedPaths: settings.behavior.blockedPaths,
+        confirmKeywords: settings.behavior.confirmKeywords,
+      },
       masking: settings.masking,
       voice: voiceProviders(),
     };

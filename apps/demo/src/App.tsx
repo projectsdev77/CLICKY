@@ -90,6 +90,10 @@ function Dashboard() {
           </div>
         ))}
       </div>
+      {/* A plain link (full page load), so agent runs that navigate can be tested. */}
+      <p>
+        <a href="/reports">View all reports</a>
+      </p>
     </Page>
   );
 }

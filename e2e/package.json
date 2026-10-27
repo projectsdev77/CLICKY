@@ -5,7 +5,8 @@
   "scripts": {
     "m0": "node m0-dashboard.mjs",
     "m1": "node m1-assistant.mjs",
-    "all": "node m0-dashboard.mjs && node m1-assistant.mjs"
+    "m2": "node m2-agent.mjs",
+    "all": "node m0-dashboard.mjs && node m1-assistant.mjs && node m2-agent.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.0"

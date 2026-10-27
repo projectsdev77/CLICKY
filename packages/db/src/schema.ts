@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import { customType, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, customType, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { organization } from "./auth-schema";
 
 export * from "./auth-schema";
@@ -143,5 +143,67 @@ export const knowledgeChunk = pgTable(
   (table) => [
     index("knowledge_chunk_project_idx").on(table.projectId),
     index("knowledge_chunk_search_idx").using("gin", table.searchVector),
+  ],
+);
+
+/**
+ * One assistant turn that may span several model calls (agent mode: act, observe, act again).
+ * `messages` is the exact Anthropic request history for the run, stored as the raw JSON
+ * string and only ever appended to, so thinking blocks replay unchanged.
+ */
+export const agentRun = pgTable(
+  "agent_run",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    endUserId: text("end_user_id")
+      .notNull()
+      .references(() => endUser.id, { onDelete: "cascade" }),
+    status: text("status").$type<"running" | "waiting" | "completed" | "cancelled" | "failed">().notNull(),
+    inputMode: text("input_mode").$type<"voice" | "text">().notNull().default("text"),
+    messages: text("messages").notNull(),
+    /** Tool results decided on the server (e.g. invalid input) to merge with the browser's results. */
+    pendingResults: text("pending_results").notNull().default("[]"),
+    steps: integer("steps").notNull().default(0),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("agent_run_conversation_idx").on(table.conversationId)],
+);
+
+/** Audit log of every action the assistant asked the browser to take, and what happened. */
+export const agentAction = pgTable(
+  "agent_action",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => agentRun.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    input: jsonb("input").notNull(),
+    needsConfirmation: boolean("needs_confirmation").notNull().default(false),
+    status: text("status"),
+    output: text("output"),
+    pageUrl: text("page_url"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [
+    index("agent_action_run_idx").on(table.runId),
+    index("agent_action_project_created_idx").on(table.projectId, table.createdAt),
   ],
 );

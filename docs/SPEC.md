@@ -244,7 +244,7 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 | **M0 Foundations** ✅ | Monorepo, CI, Postgres schema, auth, orgs/projects/team, install snippet + detection, demo app | 1 wk |
 | **M1 SDK + Ask** ✅ | Shadow-DOM widget, DOM snapshot + redaction, streamed chat, knowledge base (URL crawl + pasted articles), point-the-way, conversation log, assistant settings | 2 wks |
 | **M1.5 Voice** ✅ | Push-to-talk (hold Alt/⌥+Space or the mic button), STT/TTS with browser fallback, interruption, speech synced with pointing, mic-permission UX | 1 wk |
-| **M2 Agent** | Agent loop, action executor, policies + confirmation gates, step-by-step walkthroughs, error recovery | 2 wks |
+| **M2 Agent** ✅ | Agent loop (click/type/select/navigate/scroll), teach mode (wait_for_user walkthroughs), confirmation gates (click or say "yes"), admin blocked pages + keywords, guide-only mode, error reporting from the page, resume across full page loads, action audit log in transcripts | 2 wks |
 | **M3 Dashboard analytics** | Event ingest, overview metrics, conversation log, topic clustering, widget appearance/behavior settings | 1.5 wks |
 | **M4 Billing + marketing** | Stripe plans/usage limits, marketing site port from Lovable, docs, pricing page | 1 wk |
 | **M5 Hardening** | E2E tests on demo app, security review, performance budget, beta onboarding | 1 wk |
