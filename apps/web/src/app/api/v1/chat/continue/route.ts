@@ -88,10 +88,10 @@ export async function POST(request: Request) {
       system: buildSystemPrompt({
         assistantName: settings.appearance.assistantName,
         appName: proj.name,
-        mode: settings.behavior.mode,
+        mode: run.mode,
         customInstructions: settings.behavior.customInstructions,
       }),
-      mode: settings.behavior.mode,
+      mode: run.mode,
       pageUrl,
       send,
       signal: request.signal,

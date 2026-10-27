@@ -1,0 +1,1 @@
+ALTER TABLE "agent_run" ADD COLUMN "mode" text DEFAULT 'agent' NOT NULL;

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { listProjects, requireActiveOrg } from "@/lib/dal";
+import { getBillingState } from "@/lib/billing";
 import { signOut, switchOrganization } from "@/app/actions";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const { user, organization, memberships } = await requireActiveOrg();
-  const projects = await listProjects(organization.id);
+  const [projects, billing] = await Promise.all([listProjects(organization.id), getBillingState(organization.id)]);
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -51,6 +52,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <Link href="/team" className="block rounded px-2 py-1 text-sm hover:bg-background">
             Team
           </Link>
+          <Link href="/billing" className="block rounded px-2 py-1 text-sm hover:bg-background">
+            Billing <span className="text-xs text-muted">· {billing.plan.name}</span>
+          </Link>
+          {billing.status === "trialing" && billing.trialEndsAt && (
+            <p className="px-2 text-xs text-muted">Trial ends {billing.trialEndsAt.toLocaleDateString()}</p>
+          )}
+          {billing.status === "trial_ended" && (
+            <Link href="/billing" className="block px-2 text-xs text-brand">
+              Trial ended: upgrade
+            </Link>
+          )}
         </nav>
 
         <div className="mt-auto border-t border-border pt-4 text-sm">

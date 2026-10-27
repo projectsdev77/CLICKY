@@ -172,6 +172,8 @@ export const agentRun = pgTable(
       .notNull()
       .references(() => endUser.id, { onDelete: "cascade" }),
     status: text("status").$type<"running" | "waiting" | "completed" | "cancelled" | "failed">().notNull(),
+    /** Mode (and so tool set) for the whole run, fixed at the start: plan limits can turn actions off. */
+    mode: text("mode").$type<"agent" | "guide">().notNull().default("agent"),
     inputMode: text("input_mode").$type<"voice" | "text">().notNull().default("text"),
     messages: text("messages").notNull(),
     /** Tool results decided on the server (e.g. invalid input) to merge with the browser's results. */
@@ -256,3 +258,23 @@ export const event = pgTable(
     index("event_project_type_path_idx").on(table.projectId, table.type, table.path),
   ],
 );
+
+/** An organization's plan. Created with a trial when the organization is; kept in sync by Stripe webhooks. */
+export const subscription = pgTable("subscription", {
+  organizationId: text("organization_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  plan: text("plan").$type<"free" | "growth" | "scale" | "enterprise">().notNull(),
+  status: text("status").$type<"trialing" | "active" | "past_due" | "canceled">().notNull(),
+  trialEndsAt: timestamp("trial_ends_at"),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  /** Start of the current billing month (usage resets here). */
+  periodStart: timestamp("period_start").defaultNow().notNull(),
+  periodEnd: timestamp("period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});

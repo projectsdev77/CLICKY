@@ -246,7 +246,7 @@ Behavior at limit (borrowed from heyclicky): Ask mode keeps working at a soft ca
 | **M1.5 Voice** ✅ | Push-to-talk (hold Alt/⌥+Space or the mic button), STT/TTS with browser fallback, interruption, speech synced with pointing, mic-permission UX | 1 wk |
 | **M2 Agent** ✅ | Agent loop (click/type/select/navigate/scroll), teach mode (wait_for_user walkthroughs), confirmation gates (click or say "yes"), admin blocked pages + keywords, guide-only mode, error reporting from the page, resume across full page loads, action audit log in transcripts | 2 wks |
 | **M3 Dashboard analytics** ✅ | Overview (KPIs, conversations/day, topics), automatic topic grouping + knowledge gaps (Claude Haiku 5.5, background), 👍/👎 feedback, struggle signals (rage/dead clicks, form errors, stuck on form) → friction map + problem elements, conversation filters, demo-data seed | 1.5 wks |
-| **M4 Billing + marketing** | Stripe plans/usage limits, marketing site port from Lovable, docs, pricing page | 1 wk |
+| **M4 Billing + marketing** ✅ | Plans (Free/Growth/Scale/Enterprise) with enforced limits and 14-day Growth trial, Stripe Checkout + portal + webhooks (dev plan switcher until keys exist), Billing page with usage meters, Resend email, public site: landing, pricing, docs, security, draft privacy/terms | 1 wk |
 | **M5 Hardening** | E2E tests on demo app, security review, performance budget, beta onboarding | 1 wk |
 | **v1 (post-MVP)** | Proactive struggle detection + nudges, friction map, onboarding flows, workflows, registered app actions, digests, audit log, human handoff | 4–6 wks |
 

@@ -1,12 +1,15 @@
 import { requireProject } from "@/lib/dal";
+import { getPlanState } from "@/lib/billing";
 import { getPageFriction, getProblemElements, parseRange } from "@/lib/analytics";
 import { Card } from "@/components/ui";
 import { RangeFilter } from "@/components/range-filter";
 
 export default async function FrictionPage({ params, searchParams }: PageProps<"/projects/[projectId]/friction">) {
   const { projectId } = await params;
-  const days = parseRange((await searchParams).days);
+  let days = parseRange((await searchParams).days);
   const { project } = await requireProject(projectId);
+  const { plan } = await getPlanState(project.organizationId);
+  days = Math.min(days, plan.limits.analyticsDays) as typeof days;
   const [pages, elements] = await Promise.all([getPageFriction(project.id, days), getProblemElements(project.id, days)]);
   const maxScore = Math.max(1, ...pages.map((p) => p.score));
   const th = "px-2 py-2 text-left font-medium text-muted";
@@ -14,7 +17,7 @@ export default async function FrictionPage({ params, searchParams }: PageProps<"
 
   return (
     <>
-      <RangeFilter days={days} basePath={`/projects/${project.id}/friction`} />
+      <RangeFilter maxDays={plan.limits.analyticsDays} days={days} basePath={`/projects/${project.id}/friction`} />
       <Card
         title="Where people struggle"
         description="Pages ranked by signs of struggle: rage clicks, clicks that do nothing, form errors, people stuck on a form, and questions asked."

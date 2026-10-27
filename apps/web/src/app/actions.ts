@@ -8,6 +8,7 @@ import { and, eq, knowledgeSource, project } from "@clicky/db";
 import { defaultProjectSettings, generatePublicKey, normalizeOrigin, parseProjectSettings, projectSettingsSchema } from "@clicky/shared";
 import { auth } from "@/lib/auth";
 import { saveTextSource, syncUrlSource } from "@/lib/knowledge";
+import { getBillingState, startTrial } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { canManage, listMemberships, requireActiveOrg, requireProject, requireUser } from "@/lib/dal";
 
@@ -71,6 +72,7 @@ export async function createWorkspace(_: ActionState, formData: FormData): Promi
     headers: requestHeaders,
   });
   if (!org) return { error: "Could not create the organization." };
+  await startTrial(org.id);
   await auth.api.setActiveOrganization({ body: { organizationId: org.id }, headers: requestHeaders });
   const projectId = await insertProject(org.id, projectName, origins);
   redirect(`/projects/${projectId}/install`);
@@ -79,6 +81,10 @@ export async function createWorkspace(_: ActionState, formData: FormData): Promi
 export async function createProject(_: ActionState, formData: FormData): Promise<ActionState> {
   const { organization, role } = await requireActiveOrg();
   if (!canManage(role)) return { error: "Only owners and admins can create projects." };
+  const billing = await getBillingState(organization.id);
+  if (billing.usage.projects >= billing.plan.limits.projects) {
+    return { error: `Your ${billing.plan.name} plan includes ${billing.plan.limits.projects} project${billing.plan.limits.projects === 1 ? "" : "s"}. Upgrade on the Billing page to add more.` };
+  }
   const name = text(formData, "name");
   const { origins, invalid } = parseOrigins(text(formData, "origin"));
   if (!name) return { error: "Name is required." };

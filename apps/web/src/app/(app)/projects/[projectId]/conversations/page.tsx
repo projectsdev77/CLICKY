@@ -4,15 +4,18 @@ import { parseRange, rangeStart } from "@/lib/analytics";
 import { RangeFilter } from "@/components/range-filter";
 import { db } from "@/lib/db";
 import { requireProject } from "@/lib/dal";
+import { getPlanState } from "@/lib/billing";
 import { Card } from "@/components/ui";
 
 export default async function ConversationsPage({ params, searchParams }: PageProps<"/projects/[projectId]/conversations">) {
   const { projectId } = await params;
   const query = await searchParams;
-  const days = parseRange(query.days);
+  let days = parseRange(query.days);
   const topicId = typeof query.topic === "string" ? query.topic : undefined;
   const rating = query.rating === "up" ? 1 : query.rating === "down" ? -1 : undefined;
   const { project } = await requireProject(projectId);
+  const { plan } = await getPlanState(project.organizationId);
+  days = Math.min(days, plan.limits.analyticsDays) as typeof days;
   const since = rangeStart(days);
   const [topicRow] = topicId
     ? await db.select().from(topic).where(and(eq(topic.id, topicId), eq(topic.projectId, project.id)))
@@ -62,7 +65,7 @@ export default async function ConversationsPage({ params, searchParams }: PagePr
   return (
     <>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <RangeFilter days={days} basePath={base} extra={keep} />
+      <RangeFilter maxDays={plan.limits.analyticsDays} days={days} basePath={base} extra={keep} />
       <div className="flex gap-2">
         {chip("All", withParams({ rating: undefined }), !rating)}
         {chip("👍 Helpful", withParams({ rating: "up" }), rating === 1)}

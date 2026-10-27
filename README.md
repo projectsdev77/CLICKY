@@ -41,6 +41,8 @@ Everything works without API keys, using stand-ins:
 | `ANTHROPIC_API_KEY` | A simple local stand-in that matches words to page elements | Claude answers (Opus 5.5 by default, `CLICKY_ASSISTANT_MODEL` to change) |
 | `DEEPGRAM_API_KEY` | The browser's built-in speech recognition (Chrome, Edge, Safari) | Fast, accurate streaming transcription in every browser |
 | `ELEVENLABS_API_KEY` | The browser's built-in voices | Natural-sounding speech |
+| `STRIPE_*` | Plans shown, a dev-only plan switcher (`CLICKY_DEV_BILLING=1` in a production build) | Real checkout, customer portal, webhooks (`/api/stripe/webhook`) |
+| `RESEND_API_KEY` | Emails printed to the server log | Real magic-link and invite emails |
 
 Emails (magic links, invitations) are printed to the web server log until an email provider is configured.
 

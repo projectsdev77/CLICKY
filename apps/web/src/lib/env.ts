@@ -24,5 +24,13 @@ export const env = {
   DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
   ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
   ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM",
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRICES: {
+    growth: { month: process.env.STRIPE_PRICE_GROWTH_MONTHLY, year: process.env.STRIPE_PRICE_GROWTH_YEARLY },
+    scale: { month: process.env.STRIPE_PRICE_SCALE_MONTHLY, year: process.env.STRIPE_PRICE_SCALE_YEARLY },
+  },
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  EMAIL_FROM: process.env.EMAIL_FROM ?? "Clicky <hello@clicky.local>",
   ELEVENLABS_MODEL_ID: process.env.ELEVENLABS_MODEL_ID ?? "eleven_flash_v2_5",
 };

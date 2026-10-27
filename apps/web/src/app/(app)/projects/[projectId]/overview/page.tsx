@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireProject } from "@/lib/dal";
+import { getPlanState } from "@/lib/billing";
 import { getDailyConversations, getOverview, getTopics, parseRange } from "@/lib/analytics";
 import { Card } from "@/components/ui";
 import { Stat } from "@/components/stat";
@@ -10,8 +11,10 @@ const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whol
 
 export default async function OverviewPage({ params, searchParams }: PageProps<"/projects/[projectId]/overview">) {
   const { projectId } = await params;
-  const days = parseRange((await searchParams).days);
+  let days = parseRange((await searchParams).days);
   const { project } = await requireProject(projectId);
+  const { plan } = await getPlanState(project.organizationId);
+  days = Math.min(days, plan.limits.analyticsDays) as typeof days;
   const [o, daily, topics] = await Promise.all([
     getOverview(project.id, days),
     getDailyConversations(project.id, days),
@@ -31,7 +34,7 @@ export default async function OverviewPage({ params, searchParams }: PageProps<"
 
   return (
     <>
-      <RangeFilter days={days} basePath={`${base}/overview`} />
+      <RangeFilter maxDays={plan.limits.analyticsDays} days={days} basePath={`${base}/overview`} />
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="sm:row-span-2">
           <Stat
