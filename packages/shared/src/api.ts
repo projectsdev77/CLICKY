@@ -42,11 +42,25 @@ export const sdkCallerSchema = z.object({
 });
 
 
+const appActionSchema = z.object({
+  name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$/),
+  description: z.string().max(300),
+  parameters: z
+    .object({
+      properties: z.record(z.string(), z.object({ type: z.string().max(20).optional(), description: z.string().max(200).optional(), enum: z.array(z.unknown()).max(30).optional() })).optional(),
+      required: z.array(z.string()).max(20).optional(),
+    })
+    .optional(),
+  confirm: z.boolean().optional(),
+});
+
 const pageSchema = z.object({
   url: z.string().max(2048),
   title: z.string().max(300).default(""),
   /** Redacted, LLM-friendly description of the page (see the SDK's snapshot module). */
   snapshot: z.string().max(MAX_SNAPSHOT_CHARS),
+  /** Functions the app registered with Clicky.registerAction(). */
+  appActions: z.array(appActionSchema).max(30).default([]),
 });
 
 export const chatRequestSchema = sdkCallerSchema.extend({

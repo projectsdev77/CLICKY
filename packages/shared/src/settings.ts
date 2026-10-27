@@ -49,6 +49,15 @@ export const handoffSchema = z.object({
   label: z.string().min(1).max(40).default("Talk to a person"),
 });
 
+export const workflowSchema = z.object({
+  id: z.string().max(40),
+  /** What the user is trying to do, e.g. "Invite a teammate". */
+  name: z.string().min(1).max(80),
+  /** The steps, in plain language, the way you'd explain them to a new support agent. */
+  instructions: z.string().min(1).max(3000),
+});
+export type Workflow = z.infer<typeof workflowSchema>;
+
 export const dataSchema = z.object({
   /** Conversations and signals older than this are deleted automatically. */
   retentionDays: z.number().int().min(7).max(730).default(90),
@@ -61,6 +70,7 @@ export const projectSettingsSchema = z.object({
   data: dataSchema.prefault({}),
   proactive: proactiveSchema.prefault({}),
   handoff: handoffSchema.prefault({}),
+  workflows: z.array(workflowSchema).max(30).default([]),
 });
 
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;

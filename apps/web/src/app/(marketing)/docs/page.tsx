@@ -62,6 +62,15 @@ Clicky.init({ projectKey: "pk_your_project_key", apiUrl: "${app}" });`}</code>
           </tr>
           <tr>
             <td>
+              <code>Clicky.registerAction(name, info, handler)</code>
+            </td>
+            <td>
+              Lets Clicky call a function in your app directly instead of clicking through the UI (see below). Returns a
+              function that removes it.
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>Clicky.open()</code>
             </td>
             <td>Opens the Clicky panel, e.g. from your own &quot;Help&quot; button.</td>
@@ -83,6 +92,30 @@ Clicky.init({ projectKey: "pk_your_project_key", apiUrl: "${app}" });`}</code>
       <p>
         With the script tag, the same API is on <code>window.Clicky</code>.
       </p>
+
+      <h2>App actions</h2>
+      <p>
+        Give Clicky a reliable shortcut for things users ask for often. It calls your function with arguments it fills in
+        from the conversation, and shows the step to the user like any other.
+      </p>
+      <pre>
+        <code>{`Clicky.registerAction(
+  "exportReports",
+  {
+    description: "Export every report in the table as a file.",
+    parameters: {
+      properties: { format: { type: "string", enum: ["csv", "xlsx", "pdf"] } },
+      required: ["format"],
+    },
+    confirm: false, // true: always ask the user first
+  },
+  async ({ format }) => {
+    await api.exportReports(format);
+    return { ok: true }; // optional: told to the assistant
+  },
+);`}</code>
+      </pre>
+      <p>Register actions where they make sense (for example, when a page mounts) and remove them when they don&apos;t.</p>
 
       <h2>Privacy controls in your HTML</h2>
       <table>

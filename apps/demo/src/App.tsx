@@ -104,10 +104,43 @@ const REPORTS = [
   { id: 3, name: "Churn by plan", owner: "Dana", updated: "2026-09-28" },
 ];
 
+/** The Clicky script loads async; wait for window.Clicky, then register. */
+function useClickyAction(name: string, info: object, handler: (args: Record<string, unknown>) => unknown) {
+  useEffect(() => {
+    type ClickyApi = { registerAction(n: string, i: object, h: typeof handler): () => void };
+    let unregister: (() => void) | undefined;
+    const timer = setInterval(() => {
+      const clicky = (window as unknown as { Clicky?: ClickyApi }).Clicky;
+      if (!clicky) return;
+      clearInterval(timer);
+      unregister = clicky.registerAction(name, info, handler);
+    }, 100);
+    return () => {
+      clearInterval(timer);
+      unregister?.();
+    };
+    // Registered once per mount; the handler reads state through setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name]);
+}
+
 function Reports() {
   const [reports, setReports] = useState(REPORTS);
   const [format, setFormat] = useState("csv");
   const [message, setMessage] = useState("");
+  // Lets Clicky export directly instead of clicking through the form.
+  useClickyAction(
+    "exportReports",
+    {
+      description: "Export every report in the table as a file.",
+      parameters: { properties: { format: { type: "string", enum: ["csv", "xlsx", "pdf"] } }, required: ["format"] },
+    },
+    ({ format: f }) => {
+      setFormat(String(f));
+      setMessage(`Exported ${REPORTS.length} reports as ${String(f).toUpperCase()} (via app action).`);
+      return { exported: REPORTS.length, format: f };
+    },
+  );
   return (
     <Page title="Reports">
       <div className="toolbar">

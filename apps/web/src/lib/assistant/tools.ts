@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { RISKY_ACTION_RE, type AgentAction, type AgentActionName } from "@clicky/shared";
+import { APP_ACTION_NAME_RE, RISKY_ACTION_RE, type AgentAction, type AgentActionName } from "@clicky/shared";
 
 /**
  * Tools the assistant can call. They all run in the user's browser (the widget
@@ -19,6 +19,12 @@ const inputSchemas = {
   navigate: z.object({ path: z.string().regex(/^\/(?!\/)/).max(500), description, needs_confirmation: z.boolean() }),
   scroll: z.object({ direction: z.enum(["up", "down"]), ref: ref.nullable(), description }),
   wait_for_user: z.object({ ref, instruction: z.string().min(1).max(200), description }),
+  app_action: z.object({
+    action: z.string().regex(APP_ACTION_NAME_RE),
+    arguments_json: z.string().max(4000),
+    description,
+    needs_confirmation: z.boolean(),
+  }),
 } satisfies Record<AgentActionName, z.ZodType>;
 
 const DESCRIPTION_PROP = {
@@ -73,6 +79,17 @@ const ACTION_TOOLS: Anthropic.Beta.BetaTool[] = [
   }),
 ];
 
+const APP_ACTION_TOOL = tool(
+  "app_action",
+  "Run a function the app provides (listed with the page under <app_actions>). Prefer this over clicking when an app action does exactly what's needed.",
+  {
+    action: { type: "string", description: "The app action's name, exactly as listed." },
+    arguments_json: { type: "string", description: "Its arguments as a JSON object, e.g. {\"format\": \"pdf\"}. Use {} when it takes none." },
+    description: DESCRIPTION_PROP,
+    needs_confirmation: CONFIRM_PROP,
+  },
+);
+
 const WAIT_FOR_USER_TOOL = tool(
   "wait_for_user",
   "Teach mode: point at an element, tell the user what to do with it, and wait until they've done it (or 2 minutes pass). Use one step at a time to walk someone through a task themselves.",
@@ -84,7 +101,7 @@ const WAIT_FOR_USER_TOOL = tool(
 );
 
 export function toolsFor(mode: "agent" | "guide"): Anthropic.Beta.BetaTool[] {
-  return mode === "agent" ? [...ACTION_TOOLS, WAIT_FOR_USER_TOOL] : [WAIT_FOR_USER_TOOL];
+  return mode === "agent" ? [...ACTION_TOOLS, APP_ACTION_TOOL, WAIT_FOR_USER_TOOL] : [WAIT_FOR_USER_TOOL];
 }
 
 export type ParsedToolUse =
@@ -103,6 +120,16 @@ export function parseToolUse(block: Anthropic.Beta.BetaToolUseBlock, mode: "agen
     return { ok: false, id: block.id, error: `Invalid input: ${parsed.error.issues[0]?.message ?? "bad input"}. Try again.` };
   }
   const input = parsed.data as Record<string, unknown>;
+  let args: Record<string, unknown> | undefined;
+  if (name === "app_action") {
+    try {
+      const value: unknown = JSON.parse(String(input.arguments_json || "{}"));
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+      args = value as Record<string, unknown>;
+    } catch {
+      return { ok: false, id: block.id, error: "arguments_json must be a JSON object. Try again." };
+    }
+  }
   const desc = String(input.description);
   const modelAsked = input.needs_confirmation === true;
   const action: AgentAction = {
@@ -117,6 +144,8 @@ export function parseToolUse(block: Anthropic.Beta.BetaToolUseBlock, mode: "agen
       url: typeof input.path === "string" ? input.path : undefined,
       direction: input.direction === "up" || input.direction === "down" ? input.direction : undefined,
       instruction: typeof input.instruction === "string" ? input.instruction : undefined,
+      actionName: typeof input.action === "string" ? input.action : undefined,
+      args,
     },
     // The widget adds its own checks (the element's label, admin keywords) before acting.
     needsConfirmation: name !== "wait_for_user" && name !== "scroll" && (modelAsked || RISKY_ACTION_RE.test(desc)),

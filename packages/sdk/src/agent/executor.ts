@@ -3,6 +3,7 @@ import type { SdkInitResponse } from "@clicky/shared";
 import type { Pointer } from "../pointer";
 import { maskPII } from "../redact";
 import { isSensitive } from "../snapshot";
+import { validateArgs, type AppActionRegistry } from "./app-actions";
 
 /**
  * Carries out one action on the page, the way a person would: the pointer moves
@@ -15,6 +16,7 @@ export interface ExecContext {
   pointer: Pointer;
   config: Pick<SdkInitResponse, "masking" | "behavior">;
   signal: AbortSignal;
+  appActions?: AppActionRegistry;
 }
 
 const sleep = (ms: number, signal?: AbortSignal) =>
@@ -86,7 +88,8 @@ async function show(el: Element, ctx: ExecContext) {
 
 /** Why this action isn't allowed here (admin-blocked page), or null. */
 export function blockedReason(action: AgentAction, config: Pick<SdkInitResponse, "behavior">): string | null {
-  if (action.name === "wait_for_user" || action.name === "scroll") return null;
+  // App actions are the app's own API: the app decided they're safe to expose, so page blocks don't apply.
+  if (action.name === "wait_for_user" || action.name === "scroll" || action.name === "app_action") return null;
   if (isPathBlocked(config.behavior.blockedPaths, location.pathname)) {
     return "Actions are turned off on this page by the app's team. Tell the user how to do it themselves.";
   }
@@ -180,6 +183,30 @@ export async function executeAction(action: AgentAction, ctx: ExecContext): Prom
         await sleep(500, ctx.signal);
         break;
       }
+      case "app_action": {
+        const registered = input.actionName ? ctx.appActions?.get(input.actionName) : undefined;
+        if (!registered) return result("failed", `The app doesn't offer an action called "${input.actionName}" on this page.`);
+        const args = input.args ?? {};
+        const invalid = validateArgs(registered, args);
+        if (invalid) return result("failed", invalid);
+        let value: unknown;
+        try {
+          value = await Promise.race([
+            Promise.resolve(registered.handler(args)),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("The app didn't respond within 15 seconds.")), 15_000)),
+          ]);
+        } catch (error) {
+          return result("failed", error instanceof Error ? error.message : "The app reported an error.");
+        }
+        await settle();
+        let output = "";
+        try {
+          output = value === undefined ? "" : JSON.stringify(value).slice(0, 1500);
+        } catch {
+          output = String(value).slice(0, 1500);
+        }
+        return result("done", `${input.description}: done.${output ? ` The app returned: ${output}` : ""}`);
+      }
       case "wait_for_user": {
         if (!el) return result("failed", "No element given.");
         const outcome = await waitForUser(el, ctx);
@@ -243,9 +270,14 @@ function waitForUser(el: Element, ctx: ExecContext): Promise<"done" | "timeout" 
 }
 
 /** Should the user approve this step first? Server hint, risky wording on the element, or the admin's keywords. */
-export function needsConfirmation(action: AgentAction, ctx: Pick<ExecContext, "refs" | "config">, riskyRe: RegExp): boolean {
+export function needsConfirmation(
+  action: AgentAction,
+  ctx: Pick<ExecContext, "refs" | "config" | "appActions">,
+  riskyRe: RegExp,
+): boolean {
   if (action.name === "wait_for_user" || action.name === "scroll") return false;
   if (action.needsConfirmation) return true;
+  if (action.name === "app_action" && action.input.actionName && ctx.appActions?.get(action.input.actionName)?.confirm) return true;
   const el = action.input.ref ? ctx.refs.get(action.input.ref) : undefined;
   const text = `${action.input.description} ${el ? label(el) : ""}`.toLowerCase();
   if (riskyRe.test(text)) return true;

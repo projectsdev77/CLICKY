@@ -2,6 +2,7 @@ import { MarkerParser, RISKY_ACTION_RE, stripMarkers, type ActionResult, type Ag
 import type { ChatEvent, HandoffResponse, SdkInitResponse, VoiceTokenResponse } from "@clicky/shared";
 import type { StruggleKind } from "./signals";
 import { ApiError, postEventStream, postJson } from "./api";
+import { AppActionRegistry } from "./agent/app-actions";
 import { blockedReason, executeAction, needsConfirmation, settle } from "./agent/executor";
 import { takeSnapshot, type PageSnapshot } from "./snapshot";
 import { createListener, type Listener } from "./speech/listen";
@@ -51,6 +52,7 @@ interface Turn {
  */
 export class Assistant {
   readonly widget: Widget;
+  readonly appActions = new AppActionRegistry();
   private session: SessionState;
   private listener: Listener | null;
   private speaker: Speaker | null;
@@ -309,6 +311,7 @@ export class Assistant {
       pointer: this.widget.pointer,
       config: this.config,
       signal,
+      appActions: this.appActions,
     };
 
     for (let i = startAt; i < actions.length; i++) {
@@ -437,7 +440,12 @@ export class Assistant {
   }
 
   private page() {
-    return { url: location.href, title: document.title.slice(0, 300), snapshot: this.snapshot?.text ?? "" };
+    return {
+      url: location.href,
+      title: document.title.slice(0, 300),
+      snapshot: this.snapshot?.text ?? "",
+      appActions: this.appActions.list(),
+    };
   }
 
   private pointAt(ref: string) {

@@ -1,4 +1,20 @@
+import type { AppActionInfo } from "@clicky/shared";
 import type { KnowledgeHit } from "../knowledge";
+
+function describeAppActions(actions: AppActionInfo[]): string {
+  if (!actions.length) return "";
+  const lines = actions.map((a) => {
+    const params = Object.entries(a.parameters?.properties ?? {})
+      .map(([key, p]) => {
+        const required = a.parameters?.required?.includes(key) ? "" : "?";
+        const options = p.enum ? ` one of ${p.enum.map((v) => JSON.stringify(v)).join("|")}` : "";
+        return `${key}${required}: ${p.type ?? "any"}${options}${p.description ? ` (${p.description})` : ""}`;
+      })
+      .join(", ");
+    return `- ${a.name}(${params}): ${a.description}${a.confirm ? " [always ask first]" : ""}`;
+  });
+  return `\n<app_actions>\n${lines.join("\n")}\n</app_actions>`;
+}
 
 export interface PromptContext {
   assistantName: string;
@@ -7,6 +23,8 @@ export interface PromptContext {
   customInstructions: string;
   /** Label of the widget's "talk to a person" button, if the team set one up. */
   handoffLabel?: string;
+  /** Procedures the team wrote for common tasks. */
+  workflows?: { name: string; instructions: string }[];
 }
 
 /**
@@ -24,7 +42,7 @@ How you answer:
 - ${
     ctx.mode === "guide"
       ? `You can't click or type for the user. When they want to do something, explain it, or walk them through it with wait_for_user: one step per call, pointing at the control and saying what to do, then continue when they've done it.`
-      : `You can act in the app with the tools: click, type, select, navigate and scroll. If the user asks you to do something ("export this", "turn off the digest"), do it. If they ask how to do something, show them (point and explain), and offer to do it for them; if they want to learn, walk them through it with wait_for_user, one step at a time.
+      : `You can act in the app with the tools: click, type, select, navigate and scroll, and app_action for functions the app provides (listed with the page, when there are any; prefer them when one fits). If the user asks you to do something ("export this", "turn off the digest"), do it. If they ask how to do something, show them (point and explain), and offer to do it for them; if they want to learn, walk them through it with wait_for_user, one step at a time.
 - When acting: work in small steps and check the new page snapshot after each batch. If an error or validation message appears, fix it or tell the user what's needed. Set needs_confirmation for anything that deletes, pays, sends, publishes, changes a plan or permissions, or can't easily be undone. Never type passwords, card numbers or other secrets; ask the user to enter those themselves. If you need information you don't have (a name, a date), ask rather than invent it. If the user declines a step, stop and ask what they'd like instead. Some pages may be blocked for actions by the app's team; if an action is blocked, explain how the user can do it themselves.
 - When you've finished a task, say what you did in one sentence.`
   }
@@ -38,6 +56,12 @@ ${
     ctx.customInstructions.trim()
       ? `\n\nInstructions from the ${ctx.appName} team:\n${ctx.customInstructions.trim()}`
       : ""
+  }${
+    ctx.workflows?.length
+      ? `\n\nThe ${ctx.appName} team wrote these procedures. When a request matches one, follow its steps (doing them or walking the user through them, as above), adapting to what's actually on the page:\n${ctx.workflows
+          .map((w) => `<procedure name="${w.name.replace(/"/g, "'")}">\n${w.instructions}\n</procedure>`)
+          .join("\n")}`
+      : ""
   }`;
 }
 
@@ -45,12 +69,13 @@ export interface PageContext {
   url: string;
   title: string;
   snapshot: string;
+  appActions?: AppActionInfo[];
   /** The app's team has turned off actions on this page. */
   actionsBlocked?: boolean;
 }
 
 export function describePage(page: PageContext): string {
-  return `<page url="${page.url}" title="${page.title}">\n${page.snapshot}\n</page>${
+  return `<page url="${page.url}" title="${page.title}">\n${page.snapshot}\n</page>${describeAppActions(page.appActions ?? [])}${
     page.actionsBlocked ? "\nNote: actions are turned off on this page by the app's team." : ""
   }`;
 }

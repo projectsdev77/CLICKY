@@ -75,6 +75,7 @@ export async function POST(request: Request) {
       url: pageUrl,
       title: body.page.title,
       snapshot: body.page.snapshot,
+      appActions: body.page.appActions,
       actionsBlocked: isPathBlocked(settings.behavior.blockedPaths, new URL(pageUrl, "http://x").pathname),
     };
     messages.push({
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
         mode: run.mode,
         customInstructions: settings.behavior.customInstructions,
         handoffLabel: settings.handoff.url ? settings.handoff.label : undefined,
+        workflows: settings.workflows,
       }),
       mode: run.mode,
       pageUrl,

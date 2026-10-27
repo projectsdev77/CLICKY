@@ -285,3 +285,26 @@ export async function deleteUserData(projectId: string, _: ActionState, formData
     ? { ok: `Deleted everything Clicky had for ${userId}.` }
     : { error: `No data found for ${userId}. (Anonymous visitors can't be looked up by id.)` };
 }
+
+export async function saveWorkflow(projectId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  const { project: proj } = await requireProject(projectId, { manage: true });
+  const settings = parseProjectSettings(proj.settings);
+  const id = text(formData, "id") || crypto.randomUUID().slice(0, 8);
+  const workflow = { id, name: text(formData, "name"), instructions: text(formData, "instructions") };
+  if (!workflow.name || !workflow.instructions) return { error: "Give the workflow a name and some steps." };
+  const others = settings.workflows.filter((w) => w.id !== id);
+  if (others.length >= 30) return { error: "You can have up to 30 workflows." };
+  const parsed = projectSettingsSchema.safeParse({ ...settings, workflows: [...others, workflow] });
+  if (!parsed.success) return { error: "That's too long. Keep the name under 80 characters and the steps under 3,000." };
+  await db.update(project).set({ settings: parsed.data }).where(eq(project.id, projectId));
+  revalidatePath(`/projects/${projectId}/workflows`);
+  return { ok: "Saved. Clicky will follow it from the next conversation." };
+}
+
+export async function deleteWorkflow(projectId: string, workflowId: string) {
+  const { project: proj } = await requireProject(projectId, { manage: true });
+  const settings = parseProjectSettings(proj.settings);
+  const updated = { ...settings, workflows: settings.workflows.filter((w) => w.id !== workflowId) };
+  await db.update(project).set({ settings: updated }).where(eq(project.id, projectId));
+  revalidatePath(`/projects/${projectId}/workflows`);
+}

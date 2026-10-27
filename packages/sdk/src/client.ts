@@ -1,5 +1,7 @@
 import type { SdkInitResponse } from "@clicky/shared";
+import type { AppActionInfo } from "@clicky/shared";
 import { Assistant, getAnonymousId, type Caller } from "./assistant";
+import type { AppActionHandler } from "./agent/app-actions";
 import { postQuietly } from "./api";
 import { SignalTracker } from "./signals";
 
@@ -21,6 +23,7 @@ export const DEFAULT_API_URL = "https://app.clicky.ai";
 export class ClickyClient {
   private assistant: Assistant | null = null;
   private signals: SignalTracker | null = null;
+  private pendingActions = new Map<string, { info: Omit<AppActionInfo, "name">; handler: AppActionHandler }>();
   private config: SdkInitResponse | null = null;
   private user: IdentifyOptions | null = null;
   private projectKey = "";
@@ -39,6 +42,22 @@ export class ClickyClient {
   /** Tells Clicky who the current user is, so conversations show up under their id in your dashboard. */
   identify(options: IdentifyOptions) {
     this.user = { userId: String(options.userId), traits: options.traits };
+  }
+
+  /**
+   * Lets Clicky call a function in your app directly (instead of clicking through the UI), e.g.
+   * Clicky.registerAction("exportReports", { description: "Export all reports", parameters: { properties: { format: { type: "string", enum: ["csv", "pdf"] } }, required: ["format"] } }, ({ format }) => exportAll(format)).
+   * Returns a function that unregisters it. Registrations made before init() are kept.
+   */
+  registerAction(name: string, info: Omit<AppActionInfo, "name">, handler: AppActionHandler): () => void {
+    this.pendingActions.set(name, { info, handler });
+    this.assistant?.appActions.register(name, info, handler);
+    return () => this.unregisterAction(name);
+  }
+
+  unregisterAction(name: string) {
+    this.pendingActions.delete(name);
+    this.assistant?.appActions.unregister(name);
   }
 
   /** Records a custom event (e.g. "report_created") for your Clicky analytics. */
@@ -101,6 +120,7 @@ export class ClickyClient {
       await new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
     }
     this.assistant = new Assistant(this.config, base, this.caller);
+    for (const [name, { info, handler }] of this.pendingActions) this.assistant.appActions.register(name, info, handler);
     const { trackSignals } = this.config.behavior;
     const { proactive } = this.config;
     if (trackSignals || proactive.enabled) {

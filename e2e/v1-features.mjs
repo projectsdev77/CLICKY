@@ -59,6 +59,38 @@ await popup.close();
 ok(psql(`select outcome from conversation where id='${convo}'`) === "escalated", "conversation marked escalated");
 ok((await w.locator(".msg.assistant").last().textContent()).includes("passed this conversation along"), "user is told it was passed on");
 
+// --- Registered app actions
+setSettings("{}");
+await app.goto("http://localhost:5173/reports");
+await w.locator(".launcher").waitFor({ state: "attached" });
+if (!(await w.locator(".panel").isVisible())) await w.locator(".launcher").click();
+// The demo (Vite dev mode) registers its action once React has mounted, a moment after Clicky loads.
+await app.waitForFunction(() => window.Clicky?.assistant?.appActions.list().length > 0);
+await w.locator("input").fill("please export reports as pdf");
+await w.locator("input").press("Enter");
+await idle();
+ok(await app.getByText("Exported 3 reports as PDF (via app action).").isVisible(), "Clicky calls the app's registered action with the right arguments");
+ok(psql("select output from agent_action where name='app_action' order by created_at desc limit 1").includes('"format":"pdf"'), "the app's return value goes back to the assistant");
+
+// --- Workflows (dashboard)
+const dash = await ctx.newPage();
+await dash.goto("http://localhost:3000/sign-in");
+await dash.fill("input[name=email]", "demo@clicky.test");
+await dash.fill("input[name=password]", "password123");
+await dash.click("button[type=submit]");
+await dash.waitForURL(/projects/);
+await dash.goto("http://localhost:3000/projects/seed-project/workflows");
+await dash.fill("input[name=name]", "Change your timezone");
+await dash.fill("textarea[name=instructions]", "1. Open Settings.\n2. Pick a timezone.\n3. Click Save changes.");
+await dash.getByRole("button", { name: "Add workflow" }).click();
+await dash.getByText("Saved. Clicky will follow it").waitFor();
+ok(psql("select settings->'workflows'->0->>'name' from project where id='seed-project'") === "Change your timezone", "workflow saved to the project");
+await dash.reload();
+await dash.getByText("Change your timezone").click();
+await dash.getByRole("button", { name: "Remove" }).click();
+await dash.getByText("No workflows yet.").waitFor();
+ok(true, "workflow removed");
+
 setSettings("{}");
 psql("delete from conversation where project_id='seed-project'; delete from event where project_id='seed-project'");
 await browser.close();

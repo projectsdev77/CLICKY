@@ -58,6 +58,7 @@ const toolId = () => `toolu_stub_${Date.now().toString(36)}_${counter++}`;
 
 export interface StubInput {
   question: string;
+  appActions?: { name: string; description: string; parameters?: { properties?: Record<string, { enum?: unknown[] }> } }[];
   snapshot: string;
   knowledge: KnowledgeHit[];
   mode: "agent" | "guide";
@@ -111,6 +112,24 @@ export async function* callStub(input: StubInput): ModelStream {
 
   const isRequest = /^(please|can you|could you)\b|\bfor me\b|^(export|delete|turn|set|switch|save|open|go)\b/.test(q);
   if (input.mode === "agent" && isRequest) {
+    // A registered app action whose name/description matches the request.
+    const appAction = (input.appActions ?? []).find((a) => score(wanted, `${a.name.replace(/([a-z])([A-Z])/g, "$1 $2")} ${a.description}`) >= 2);
+    if (appAction) {
+      const args: Record<string, unknown> = {};
+      for (const [key, p] of Object.entries(appAction.parameters?.properties ?? {})) {
+        const choice = p.enum?.find((v) => q.includes(String(v).toLowerCase()));
+        if (choice !== undefined) args[key] = choice;
+      }
+      toolUse("app_action", {
+        action: appAction.name,
+        arguments_json: JSON.stringify(args),
+        description: appAction.description.split(/[.!]/)[0]!.slice(0, 80),
+        needs_confirmation: false,
+      });
+      yield* say("On it.");
+      content.unshift({ type: "text", text: "On it.", citations: null } as Anthropic.Beta.BetaTextBlock);
+      return { content, stopReason: "tool_use", usage };
+    }
     // A dropdown whose option is mentioned, then the best button.
     for (const el of elements.filter((e) => e.role === "select")) {
       const option = el.options.find((o) => q.includes(o.toLowerCase()));

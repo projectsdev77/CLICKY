@@ -99,3 +99,30 @@ describe("needsConfirmation", () => {
     expect(needsConfirmation(action("wait_for_user", { ref: "e1" }, true), ctx(refs()), RISKY_ACTION_RE)).toBe(false);
   });
 });
+
+describe("app actions", () => {
+  it("validates arguments, calls the handler and reports its result", async () => {
+    const { AppActionRegistry } = await import("./app-actions");
+    const registry = new AppActionRegistry();
+    const handler = vi.fn(async ({ format }: Record<string, unknown>) => ({ exported: 3, format }));
+    registry.register("exportReports", { description: "Export all reports", parameters: { properties: { format: { type: "string", enum: ["csv", "pdf"] } }, required: ["format"] } }, handler);
+    const run = (args: Record<string, unknown>) =>
+      executeAction(action("app_action", { actionName: "exportReports", args, description: "Export reports" }), { ...ctx({}), appActions: registry });
+
+    expect((await run({})).output).toContain('Missing "format"');
+    expect((await run({ format: "xlsx" })).output).toContain("must be one of");
+    const ok = await run({ format: "pdf" });
+    expect(ok.status).toBe("done");
+    expect(ok.output).toContain('{"exported":3,"format":"pdf"}');
+    expect(handler).toHaveBeenCalledOnce();
+    const missing = await executeAction(action("app_action", { actionName: "nope", args: {} }), { ...ctx({}), appActions: registry });
+    expect(missing.status).toBe("failed");
+  });
+
+  it("asks first when the app marked the action as needing confirmation", async () => {
+    const { AppActionRegistry } = await import("./app-actions");
+    const registry = new AppActionRegistry();
+    registry.register("archiveAll", { description: "Archive everything", confirm: true }, () => {});
+    expect(needsConfirmation(action("app_action", { actionName: "archiveAll", description: "Tidy up" }), { ...ctx({}), appActions: registry }, RISKY_ACTION_RE)).toBe(true);
+  });
+});
