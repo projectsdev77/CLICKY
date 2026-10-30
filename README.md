@@ -56,11 +56,14 @@ Emails (magic links, invitations) are printed to the web server log until an ema
 
 The SDK sends lightweight signals (page views, rage clicks, dead clicks, form errors, people stuck on a form; never field values) to `/api/v1/events`, batched every 10 seconds. After each reply, a background job groups the question into a topic and flags it if Clicky couldn't answer (Claude Haiku 5.5; a keyword stand-in without a key). The dashboard's Overview, Friction and Knowledge pages read from these. Projects can switch signal collection off in Settings.
 
+The Overview also splits topics by any trait your app passes to `Clicky.identify()` (plan, role…), to show what each kind of customer struggles to find. An empty chat offers starting points from `/api/v1/suggestions`: the team's starter questions plus topics at least two different people needed help with on that page in the last 30 days (topic names only, never what anyone typed).
+
 ## Operations
 
 - `GET /api/health`: 200 when the app and database are up (for uptime monitors).
 - `GET /api/cron/retention`: deletes conversations and signals past each project's retention period (default 90 days). Scheduled daily in `vercel.json`; needs `CRON_SECRET`.
 - `GET /api/cron/digest`: weekly insight email to owners and admins (Mondays, `vercel.json`; needs `CRON_SECRET`).
+- Usage alerts: owners and admins get one email per billing period when usage passes 80% and 100% of a plan limit.
 - Privacy requests: project Settings → "Delete a user's data".
 
 ## Common commands

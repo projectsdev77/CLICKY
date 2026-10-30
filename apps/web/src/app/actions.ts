@@ -201,6 +201,8 @@ export async function updateAssistantSettings(projectId: string, _: ActionState,
       brandColor: text(formData, "brandColor"),
       position: text(formData, "position"),
       theme: text(formData, "theme"),
+      starterQuestions: lines(text(formData, "starterQuestions")).slice(0, 5),
+      suggestTopics: formData.get("suggestTopics") === "on",
     },
     behavior: {
       ...current.behavior,

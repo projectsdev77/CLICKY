@@ -166,3 +166,13 @@ export interface OnboardingState {
 export const onboardingCompleteRequestSchema = sdkCallerSchema.extend({
   stepId: z.string().max(40),
 });
+
+export const suggestionsRequestSchema = sdkCallerSchema.extend({
+  path: z.string().max(500),
+});
+export interface SuggestionsResponse {
+  /** Ready-to-ask questions written by the team. */
+  questions: string[];
+  /** Topics people commonly need help with on this page. */
+  topics: string[];
+}

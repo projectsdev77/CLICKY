@@ -53,12 +53,16 @@ const en = {
   micBlocked: "Microphone access is blocked. Allow it in your browser to talk to me.",
   micFailed: "I couldn't start listening.",
   didntCatch: "I didn't catch that. Hold the key while you talk.",
+  helpWith: "Help me with {topic}",
+  suggestions: "Suggestions",
 };
 
 export type MessageKey = keyof typeof en;
 
 const translations: Record<string, Partial<Record<MessageKey, string>>> = {
   es: {
+    helpWith: "Ayúdame con: {topic}",
+    suggestions: "Sugerencias",
     askPlaceholder: "Pregunta lo que quieras…",
     ask: "Preguntar a {name}",
     open: "Abrir {name}",
@@ -110,6 +114,8 @@ const translations: Record<string, Partial<Record<MessageKey, string>>> = {
     didntCatch: "No te he entendido. Mantén la tecla pulsada mientras hablas.",
   },
   fr: {
+    helpWith: "Aidez-moi : {topic}",
+    suggestions: "Suggestions",
     askPlaceholder: "Posez votre question…",
     ask: "Demander à {name}",
     open: "Ouvrir {name}",
@@ -161,6 +167,8 @@ const translations: Record<string, Partial<Record<MessageKey, string>>> = {
     didntCatch: "Je n'ai pas compris. Maintenez la touche pendant que vous parlez.",
   },
   de: {
+    helpWith: "Hilf mir bei: {topic}",
+    suggestions: "Vorschläge",
     askPlaceholder: "Frag mich etwas…",
     ask: "{name} fragen",
     open: "{name} öffnen",
@@ -212,6 +220,8 @@ const translations: Record<string, Partial<Record<MessageKey, string>>> = {
     didntCatch: "Das habe ich nicht verstanden. Halte die Taste gedrückt, während du sprichst.",
   },
   pt: {
+    helpWith: "Me ajude com: {topic}",
+    suggestions: "Sugestões",
     askPlaceholder: "Pergunte qualquer coisa…",
     ask: "Perguntar a {name}",
     open: "Abrir {name}",
@@ -263,6 +273,8 @@ const translations: Record<string, Partial<Record<MessageKey, string>>> = {
     didntCatch: "Não entendi. Mantenha a tecla pressionada enquanto fala.",
   },
   it: {
+    helpWith: "Aiutami con: {topic}",
+    suggestions: "Suggerimenti",
     askPlaceholder: "Chiedi qualsiasi cosa…",
     ask: "Chiedi a {name}",
     open: "Apri {name}",

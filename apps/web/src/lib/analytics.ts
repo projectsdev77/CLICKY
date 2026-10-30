@@ -284,3 +284,37 @@ export async function getConversationsForExport(projectId: string, days: number)
     group by c.id, u.external_id
     order by c.created_at desc`);
 }
+
+/** Trait names users have been identified with (e.g. plan, role), for segment breakdowns. */
+export async function getTraitKeys(projectId: string): Promise<string[]> {
+  const result = await rows<{ key: string }>(sql`
+    select distinct jsonb_object_keys(traits) as key from end_user
+    where project_id = ${projectId} and jsonb_typeof(traits) = 'object' and traits <> '{}'::jsonb
+    order by 1 limit 30`);
+  return result.map((r) => r.key);
+}
+
+/** Questions per topic, split by a user trait's value (e.g. plan = "free" vs "pro"). */
+export async function getTopicsBySegment(projectId: string, days: number, trait: string) {
+  const { from } = window(days);
+  const result = await rows<{ topic: string; segment: string | null; n: string }>(sql`
+    select t.label as topic, u.traits ->> ${trait} as segment, count(*) as n
+    from message m
+    join conversation c on c.id = m.conversation_id
+    join end_user u on u.id = c.end_user_id
+    join topic t on t.id = m.topic_id
+    where c.project_id = ${projectId} and m.role = 'user' and m.created_at >= ${from}
+    group by 1, 2`);
+  const segments = [...new Set(result.map((r) => r.segment ?? "(not set)"))].sort();
+  const topics = new Map<string, Record<string, number>>();
+  for (const r of result) {
+    const row = topics.get(r.topic) ?? {};
+    row[r.segment ?? "(not set)"] = Number(r.n);
+    topics.set(r.topic, row);
+  }
+  const ordered = [...topics.entries()]
+    .map(([topic, counts]) => ({ topic, counts, total: Object.values(counts).reduce((a, b) => a + b, 0) }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 12);
+  return { segments: segments.slice(0, 8), rows: ordered };
+}

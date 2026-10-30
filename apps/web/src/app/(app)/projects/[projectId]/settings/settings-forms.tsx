@@ -127,6 +127,19 @@ export function AssistantForm({
           <input type="checkbox" name="trackSignals" defaultChecked={behavior.trackSignals} /> Collect page views and
           struggle signals for the Friction page (never field values)
         </label>
+        <Field label="Suggested questions" hint="Up to 5, one per line. Shown in an empty chat.">
+          <Textarea
+            name="starterQuestions"
+            defaultValue={appearance.starterQuestions.join("\n")}
+            rows={3}
+            className="font-sans"
+            placeholder={"How do I export a report?\nHow do I invite my team?"}
+          />
+        </Field>
+        <label className="flex items-center gap-2 self-start pt-7 text-sm">
+          <input type="checkbox" name="suggestTopics" defaultChecked={appearance.suggestTopics} /> Also suggest what people
+          often need help with on each page
+        </label>
         <Field label="Pages where Clicky must not act" hint="One path per line. * matches one segment, ** any depth, e.g. /admin/**">
           <Textarea name="blockedPaths" defaultValue={behavior.blockedPaths.join("\n")} rows={3} placeholder="/billing&#10;/admin/**" />
         </Field>

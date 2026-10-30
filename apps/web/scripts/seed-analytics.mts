@@ -37,7 +37,7 @@ const users = Array.from({ length: 60 }, (_, i) => ({
   projectId: PROJECT,
   anonymousId: `demo-${i}`,
   externalId: i % 3 === 0 ? `user_${1000 + i}` : null,
-  traits: {},
+  traits: { plan: ["free", "growth", "scale"][i % 3]!, role: i % 4 === 0 ? "admin" : "member" },
 }));
 await db.insert(endUser).values(users);
 

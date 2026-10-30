@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { requireProject } from "@/lib/dal";
 import { getPlanState } from "@/lib/billing";
-import { getDailyConversations, getOverview, getTopics, parseRange } from "@/lib/analytics";
+import { getDailyConversations, getOverview, getTopics, getTopicsBySegment, getTraitKeys, parseRange } from "@/lib/analytics";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 import { Stat } from "@/components/stat";
 import { DailyColumns, RankedBars } from "@/components/charts";
@@ -16,11 +16,16 @@ export default async function OverviewPage({ params, searchParams }: PageProps<"
   const { project } = await requireProject(projectId);
   const { plan } = await getPlanState(project.organizationId);
   days = Math.min(days, plan.limits.analyticsDays) as typeof days;
-  const [o, daily, topics] = await Promise.all([
+  const query = await searchParams;
+  const [o, daily, topics, traitKeys] = await Promise.all([
     getOverview(project.id, days),
     getDailyConversations(project.id, days),
     getTopics(project.id, days),
+    getTraitKeys(project.id),
   ]);
+  const trait = typeof query.trait === "string" && traitKeys.includes(query.trait) ? query.trait : traitKeys[0];
+  const segments = trait ? await getTopicsBySegment(project.id, days, trait) : null;
+  const maxCell = Math.max(1, ...(segments?.rows.flatMap((r) => Object.values(r.counts)) ?? [1]));
   const base = `/projects/${project.id}`;
 
   if (o.conversations === 0 && o.previousConversations === 0) {
@@ -86,6 +91,61 @@ export default async function OverviewPage({ params, searchParams }: PageProps<"
           />
         )}
       </Card>
+
+      {segments && segments.rows.length > 0 && (
+        <Card
+          title="Who asks about what"
+          description="Questions per topic, by a trait your app passes to Clicky.identify(). Useful for spotting what each kind of customer struggles to discover."
+        >
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Split by">
+            {traitKeys.map((k) => (
+              <Link
+                key={k}
+                href={`${base}/overview?days=${days}&trait=${encodeURIComponent(k)}`}
+                aria-current={k === trait ? "true" : undefined}
+                className={`rounded-full border px-3 py-1 text-xs ${k === trait ? "border-brand text-brand-ink" : "border-border text-muted"}`}
+              >
+                {k}
+              </Link>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <caption className="sr-only">Questions per topic by {trait}</caption>
+              <thead>
+                <tr className="border-b border-border">
+                  <th scope="col" className="px-2 py-2 text-left font-medium text-muted">Topic</th>
+                  {segments.segments.map((seg) => (
+                    <th key={seg} scope="col" className="px-2 py-2 text-right font-medium text-muted">
+                      {seg}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {segments.rows.map((r) => (
+                  <tr key={r.topic} className="border-b border-border">
+                    <th scope="row" className="px-2 py-2 text-left font-normal">{r.topic}</th>
+                    {segments.segments.map((seg) => {
+                      const n = r.counts[seg] ?? 0;
+                      return (
+                        <td key={seg} className="px-1 py-1 text-right tabular-nums">
+                          <span
+                            className="block rounded px-2 py-1"
+                            style={{ background: n ? `color-mix(in srgb, var(--chart-1) ${Math.round(8 + (n / maxCell) * 40)}%, transparent)` : undefined }}
+                          >
+                            {n || "–"}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

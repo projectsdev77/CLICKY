@@ -10,12 +10,17 @@ import {
   gte,
   inArray,
   ne,
+  member,
   organization,
   project,
   subscription,
+  usageAlert,
+  user,
 } from "@clicky/db";
 import { assistantAllowance, effectivePlan, TRIAL_DAYS, TRIAL_PLAN, type PlanState } from "@clicky/shared";
 import { db } from "./db";
+import { env } from "./env";
+import { sendEmail } from "./email";
 
 type Subscription = typeof subscription.$inferSelect;
 
@@ -118,9 +123,53 @@ export async function getAllowance(organizationId: string) {
   const state = await getBillingState(organizationId);
   const value = assistantAllowance(state.plan, state.usage);
   allowanceCache.set(organizationId, { at: Date.now(), value });
+  void sendUsageAlerts(organizationId, state).catch((error: unknown) => console.error("[billing] usage alert failed", error));
   return value;
 }
 
 export function clearAllowanceCache(organizationId: string) {
   allowanceCache.delete(organizationId);
+}
+
+const METRICS = [
+  { metric: "conversations" as const, label: "conversations", limit: (s: BillingState) => s.plan.limits.conversations, used: (s: BillingState) => s.usage.conversations },
+  { metric: "agentTasks" as const, label: "tasks done for users", limit: (s: BillingState) => s.plan.limits.agentTasks, used: (s: BillingState) => s.usage.agentTasks },
+];
+
+/** Emails owners and admins once per billing period when usage passes 80% and 100% of a limit. */
+export async function sendUsageAlerts(organizationId: string, state: BillingState) {
+  for (const m of METRICS) {
+    const limit = m.limit(state);
+    if (!Number.isFinite(limit) || limit <= 0) continue;
+    const used = m.used(state);
+    for (const threshold of [100, 80]) {
+      if (used < (limit * threshold) / 100) continue;
+      const inserted = await db
+        .insert(usageAlert)
+        .values({ organizationId, periodStart: state.period.start, metric: m.metric, threshold })
+        .onConflictDoNothing()
+        .returning();
+      if (inserted.length === 0) break; // already told them about this threshold (and so the lower one)
+      const [org] = await db.select({ name: organization.name }).from(organization).where(eq(organization.id, organizationId));
+      const admins = await db
+        .select({ email: user.email })
+        .from(member)
+        .innerJoin(user, eq(member.userId, user.id))
+        .where(and(eq(member.organizationId, organizationId), inArray(member.role, ["owner", "admin"])));
+      const what =
+        threshold >= 100
+          ? m.metric === "conversations"
+            ? "Clicky keeps answering for up to 20% more, then pauses until your usage resets."
+            : "Clicky keeps guiding users but has stopped doing tasks for them until your usage resets."
+          : "You're getting close.";
+      for (const { email } of admins) {
+        await sendEmail({
+          to: email,
+          subject: `Clicky: ${org?.name ?? "your team"} has used ${threshold}% of this month's ${m.label}`,
+          text: `${org?.name ?? "Your team"} has used ${used.toLocaleString()} of ${limit.toLocaleString()} ${m.label} on the ${state.plan.name} plan this month. ${what}\n\nUsage resets on ${state.period.end.toDateString()}. Upgrade or see usage: ${env.APP_URL}/billing`,
+        });
+      }
+      break;
+    }
+  }
 }

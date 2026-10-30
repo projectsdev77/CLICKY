@@ -1,5 +1,5 @@
 import { MarkerParser, RISKY_ACTION_RE, stripMarkers, type ActionResult, type AgentAction } from "@clicky/shared/client";
-import type { ChatEvent, HandoffResponse, SdkInitResponse, VoiceTokenResponse } from "@clicky/shared";
+import type { ChatEvent, HandoffResponse, SdkInitResponse, SuggestionsResponse, VoiceTokenResponse } from "@clicky/shared";
 import type { StruggleKind } from "./signals";
 import { ApiError, postEventStream, postJson } from "./api";
 import { AppActionRegistry } from "./agent/app-actions";
@@ -85,12 +85,16 @@ export class Assistant {
         this.session.open = open;
         this.save();
         if (!open) this.speaker?.stop();
+        else void this.showSuggestions();
       },
     });
     this.widget.setVoiceAvailable(!!this.listener);
     this.widget.setMuted(this.session.muted);
     for (const m of this.session.messages) this.widget.addMessage(m.role, m.text);
-    if (this.session.open) this.widget.open();
+    if (this.session.open) {
+      this.widget.open();
+      void this.showSuggestions();
+    }
     this.bindHotkey();
     if (config.handoff.url) this.widget.setHandoff(config.handoff.label, () => void this.handoff());
 
@@ -109,6 +113,7 @@ export class Assistant {
   /** Asks a question about the current page. */
   async ask(question: string, inputMode: "voice" | "text") {
     const turn = this.beginTurn(inputMode);
+    this.widget.setSuggestions([], () => {});
     this.widget.addMessage("user", question);
     this.remember("user", question);
     this.snapshot = takeSnapshot(this.config.masking);
@@ -120,6 +125,29 @@ export class Assistant {
       page: this.page(),
     };
     await this.drive(turn, postEventStream(`${this.apiUrl}/api/v1/chat`, body, turn.controller.signal));
+  }
+
+  private suggestionCache = new Map<string, SuggestionsResponse>();
+
+  /** Starting points in an empty chat: the team's questions and common topics on this page. */
+  private async showSuggestions() {
+    if (this.session.messages.length || this.turn) return this.widget.setSuggestions([], () => {});
+    const path = location.pathname;
+    let data = this.suggestionCache.get(path);
+    if (!data) {
+      try {
+        data = await postJson<SuggestionsResponse>(`${this.apiUrl}/api/v1/suggestions`, { ...this.caller(), path });
+      } catch {
+        return;
+      }
+      this.suggestionCache.set(path, data);
+    }
+    if (this.session.messages.length || location.pathname !== path) return;
+    const items = [
+      ...data.questions.map((q) => ({ label: q, ask: q })),
+      ...data.topics.map((topic) => ({ label: topic, ask: t("helpWith", { topic }) })),
+    ].slice(0, 5);
+    this.widget.setSuggestions(items, (question) => void this.ask(question, "text"));
   }
 
   /** Someone seems stuck: offer help once per page (at most twice per visit) if the team turned this on. */

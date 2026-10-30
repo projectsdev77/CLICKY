@@ -65,6 +65,7 @@ ok(!(await o.getByText("Please confirm your email").isVisible()), "confirming th
 const r = await (await browser.newContext()).newPage();
 await r.goto("http://localhost:3000/sign-in");
 await r.getByRole("link", { name: "Forgot your password?" }).click();
+await r.waitForURL(/forgot-password/); // the sign-in page has an email field too
 await r.fill("input[name=email]", owner);
 await r.click("button[type=submit]");
 await r.getByText(/we've emailed a link/).waitFor();

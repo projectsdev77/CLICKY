@@ -192,6 +192,43 @@ await idle();
 ok((await w.locator(".msg.assistant").last().textContent()).includes("five business days"), "answers come from the uploaded PDF");
 psql("delete from knowledge_source where project_id='seed-project'");
 
+// --- Suggested questions (team-written, plus common topics on this page) and topics by segment
+setSettings('{"appearance": {"starterQuestions": ["How do I invite my team?"]}}');
+psql(`delete from conversation where project_id='seed-project';
+  delete from topic where project_id='seed-project';
+  insert into topic (id, project_id, label) values ('v1-topic', 'seed-project', 'Scheduled exports');
+  insert into end_user (id, project_id, anonymous_id, traits) values
+    ('v1-u1', 'seed-project', 'v1-anon-1', '{"plan": "free"}'), ('v1-u2', 'seed-project', 'v1-anon-2', '{"plan": "scale"}')
+    on conflict (id) do update set traits = excluded.traits;
+  insert into conversation (id, project_id, end_user_id) values ('v1-c1', 'seed-project', 'v1-u1'), ('v1-c2', 'seed-project', 'v1-u2');
+  insert into message (id, conversation_id, role, content, page_url, topic_id, answered) values
+    ('v1-m1', 'v1-c1', 'user', 'how do i schedule an export', 'http://localhost:5173/reports', 'v1-topic', true),
+    ('v1-m2', 'v1-c2', 'user', 'can exports run weekly?', 'http://localhost:5173/reports?tab=1', 'v1-topic', true)`);
+const fresh = await (await browser.newContext()).newPage();
+const fw = fresh.locator("clicky-widget");
+await fresh.goto("http://localhost:5173/reports");
+await fw.locator(".launcher").click();
+await fw.locator(".chips button").first().waitFor();
+const chips = await fw.locator(".chips button").allTextContents();
+ok(chips[0] === "How do I invite my team?" && chips.includes("Scheduled exports"), "empty chat suggests the team's questions and this page's common topics");
+ok(!chips.some((c) => c.includes("schedule an export")), "suggestions never show what other users typed");
+await fresh.screenshot({ path: `${shots}/v1-suggestions.png` });
+await fw.locator(".chips button", { hasText: "Scheduled exports" }).click();
+await fresh.waitForFunction(() => document.querySelector("clicky-widget")?.shadowRoot?.querySelector("[data-status]")?.dataset.status === "idle", null, { timeout: 20000 });
+ok((await fw.locator(".msg.user").first().textContent()) === "Help me with Scheduled exports" && (await fw.locator(".chips").count()) === 0, "picking a topic asks about it and clears the chips");
+await fresh.goto("http://localhost:5173/billing");
+await fw.locator(".launcher").waitFor({ state: "attached" });
+ok((await fw.locator(".chips").count()) === 0, "no suggestions once a conversation has started");
+await fresh.context().close();
+
+await dash.goto("http://localhost:3000/projects/seed-project/overview?trait=plan");
+const segment = dash.getByRole("table", { name: /Questions per topic by plan/ });
+await segment.waitFor();
+const row = segment.getByRole("row", { name: /Scheduled exports/ });
+ok((await segment.getByRole("columnheader").allTextContents()).some((h) => h === "scale") && (await row.textContent()).includes("1"), "overview splits topics by a user trait");
+await dash.screenshot({ path: `${shots}/v1-segments.png`, fullPage: true });
+psql("delete from conversation where id like 'v1-c%'; delete from end_user where id like 'v1-u%'; delete from topic where id='v1-topic'");
+
 // --- Widget in another language
 const es = await (await browser.newContext({ locale: "es-ES" })).newPage();
 await es.goto("http://localhost:5173/reports");

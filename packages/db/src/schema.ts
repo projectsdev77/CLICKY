@@ -294,3 +294,18 @@ export const onboardingCompletion = pgTable(
   },
   (table) => [uniqueIndex("onboarding_completion_unique_idx").on(table.endUserId, table.stepId), index("onboarding_completion_project_idx").on(table.projectId)],
 );
+
+/** Usage alert emails already sent, so each threshold is emailed once per billing period. */
+export const usageAlert = pgTable(
+  "usage_alert",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    periodStart: timestamp("period_start").notNull(),
+    metric: text("metric").$type<"conversations" | "agentTasks">().notNull(),
+    threshold: integer("threshold").notNull(),
+    sentAt: timestamp("sent_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("usage_alert_unique_idx").on(table.organizationId, table.periodStart, table.metric, table.threshold)],
+);

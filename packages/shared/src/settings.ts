@@ -8,6 +8,10 @@ export const appearanceSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/)
     .default("#6d28d9"),
   position: z.enum(["bottom-right", "bottom-left"]).default("bottom-right"),
+  /** Questions shown as starting points in an empty chat (written by the team). */
+  starterQuestions: z.array(z.string().min(1).max(120)).max(5).default([]),
+  /** Also suggest what people commonly need help with on the current page (topic names, never other users' words). */
+  suggestTopics: z.boolean().default(true),
   theme: z.enum(["light", "dark", "auto"]).default("auto"),
 });
 

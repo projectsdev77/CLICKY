@@ -16,5 +16,7 @@ describe.skipIf(!reachable)("analytics queries", () => {
     expect(await analytics.getKnowledgeGaps(id, 30)).toEqual([]);
     expect(await analytics.getPageFriction(id, 30)).toEqual([]);
     expect(await analytics.getProblemElements(id, 30)).toEqual([]);
+    expect(await analytics.getTraitKeys(id)).toEqual([]);
+    expect(await analytics.getTopicsBySegment(id, 30, "plan")).toBeDefined();
   });
 });

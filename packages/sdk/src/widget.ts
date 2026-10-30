@@ -45,6 +45,8 @@ export interface Widget {
   confirm(question: string): { result: Promise<boolean>; answer(value: boolean): void };
   /** Shows "Helpful? 👍 👎" under the latest reply (replacing any earlier one). */
   showFeedback(onRate: (rating: 1 | -1) => void): void;
+  /** Suggestion chips in an empty chat (an empty list removes them). */
+  setSuggestions(items: { label: string; ask: string }[], onPick: (question: string) => void): void;
   /** A small "need a hand?" bubble above the launcher (while the panel is closed). */
   showNudge(text: string, onAccept: () => void, onDismiss: () => void): void;
   /** Shows a "Talk to a person" link at the bottom of the panel. */
@@ -159,6 +161,9 @@ const STYLES = /* css */ `
   .checklist .hide { border: 0; padding: 0; color: var(--muted); text-decoration: underline; }
   .badge { position: absolute; top: 2px; right: 2px; width: 12px; height: 12px; border-radius: 99px; background: #ef4444; border: 2px solid #fff; }
   .badge[hidden] { display: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 4px 10px; font-size: 13px; text-align: left; }
+  .chips button:hover { background: var(--soft); }
   .stop { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 2px 10px; font-size: 12px; }
   .stop[hidden] { display: none; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -509,6 +514,25 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     feedbackRow = row;
   };
 
+  let chips: HTMLElement | null = null;
+  const setSuggestions: Widget["setSuggestions"] = (items, onPick) => {
+    chips?.remove();
+    chips = null;
+    if (!items.length) return;
+    const list = el("div", "chips");
+    list.setAttribute("role", "group");
+    list.setAttribute("aria-label", t("suggestions"));
+    for (const item of items) {
+      const chip = el("button");
+      chip.type = "button";
+      chip.textContent = item.label;
+      chip.addEventListener("click", () => onPick(item.ask));
+      list.append(chip);
+    }
+    greeting.after(list);
+    chips = list;
+  };
+
   const setChecklist: Widget["setChecklist"] = (checklist, handlers) => {
     checklistEl.replaceChildren();
     const remaining = checklist ? checklist.steps.filter((s) => !s.done).length : 0;
@@ -555,6 +579,7 @@ export function mountWidget(config: SdkInitResponse, handlers: WidgetHandlers): 
     host,
     pointer,
     setChecklist,
+    setSuggestions,
     showNudge(text, accept, dismiss) {
       if (isOpen) return;
       nudgeText.textContent = text;

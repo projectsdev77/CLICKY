@@ -1,12 +1,12 @@
 import { chromium } from "playwright-core";
 import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 const shots = process.env.SCREENSHOTS_DIR ?? new URL("./screenshots", import.meta.url).pathname;
 mkdirSync(shots, { recursive: true });
 const ok = (c, m) => { if (!c) throw new Error("FAIL: " + m); console.log("✓ " + m); };
 const psql = (q) => execSync(`PGPASSWORD=postgres psql -h localhost -U postgres clicky -tAc "${q}"`).toString().trim();
 psql("delete from conversation where project_id='seed-project'; update project set settings='{}', allowed_origins='{http://localhost:5173}' where id='seed-project'; delete from project where organization_id='seed-org' and id <> 'seed-project'");
-psql("update subscription set plan='growth', status='active', trial_ends_at=null where organization_id='seed-org'");
+psql("update subscription set plan='growth', status='active', trial_ends_at=null where organization_id='seed-org'; delete from usage_alert where organization_id='seed-org'");
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -70,6 +70,13 @@ ok((await w.locator(".msg.assistant").allTextContents()).at(-1).includes("taking
 ok(await app.locator("select[name=export-format]").inputValue() === "csv", "over the limit: nothing done");
 
 // Under the limit on Free: answers, but guide-only (no actions).
+// Owners hear about it by email (logged without an email provider), once per threshold.
+if (process.env.WEB_LOG) {
+  const alerts = () => readFileSync(process.env.WEB_LOG, "utf8").match(/has used 100% of this month's conversations/g)?.length ?? 0;
+  await app.waitForTimeout(1000);
+  ok(alerts() >= 1, "usage alert emailed at 100% of the conversation allowance");
+}
+ok(psql("select threshold from usage_alert where organization_id='seed-org' and metric='conversations'") === "100", "the 80% alert is skipped once usage is already past 100%");
 psql("delete from conversation where id like 'm4-%'");
 await dash.getByRole("button", { name: "Growth", exact: true }).click(); // clears the cached allowance
 await dash.getByText("Billing · Growth").waitFor();
