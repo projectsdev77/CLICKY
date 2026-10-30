@@ -13,6 +13,12 @@ async function audit(page, label, include) {
 }
 for (const scheme of ["light", "dark"]) {
   const ctx = await browser.newContext({ colorScheme: scheme });
+  const visitor = await ctx.newPage();
+  for (const p of ["/sign-in", "/sign-up", "/forgot-password", "/reset-password?token=x"]) {
+    await visitor.goto(`http://localhost:3000${p}`);
+    await audit(visitor, `${p} (${scheme})`);
+  }
+  await visitor.close();
   const app = await ctx.newPage();
   await app.goto("http://localhost:5173/reports");
   await app.locator("clicky-widget .launcher").click();
@@ -30,7 +36,7 @@ for (const scheme of ["light", "dark"]) {
     await dash.goto(`http://localhost:3000/projects/seed-project/${p}`);
     await audit(dash, `${p} (${scheme})`);
   }
-  for (const p of ["/", "/pricing", "/billing"]) {
+  for (const p of ["/", "/pricing", "/billing", "/team", "/account"]) {
     await dash.goto(`http://localhost:3000${p}`);
     await audit(dash, `${p} (${scheme})`);
   }

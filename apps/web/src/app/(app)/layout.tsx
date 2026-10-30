@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listProjects, requireActiveOrg } from "@/lib/dal";
 import { getBillingState } from "@/lib/billing";
 import { signOut, switchOrganization } from "@/app/actions";
+import { VerifyEmailBanner } from "./verify-banner";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const { user, organization, memberships } = await requireActiveOrg();
@@ -66,13 +67,18 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         </nav>
 
         <div className="mt-auto border-t border-border pt-4 text-sm">
-          <p className="truncate text-muted">{user.email}</p>
+          <Link href="/account" className="block truncate text-muted hover:text-foreground">
+            {user.email}
+          </Link>
           <form action={signOut}>
             <button className="mt-1 text-muted hover:text-foreground">Sign out</button>
           </form>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 px-4 py-8 md:px-10">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
+        <main className="min-w-0 flex-1 px-4 py-8 md:px-10">{children}</main>
+      </div>
     </div>
   );
 }

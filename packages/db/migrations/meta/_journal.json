@@ -50,6 +50,13 @@
       "when": 1793099638527,
       "tag": "0006_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793355154166,
+      "tag": "0007_two_factor",
+      "breakpoints": true
     }
   ]
 }

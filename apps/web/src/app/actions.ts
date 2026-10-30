@@ -372,3 +372,55 @@ export async function sendDigestPreview(projectId: string): Promise<ActionState>
   await sendEmail({ to: user.email, ...digest });
   return { ok: `Sent to ${user.email}.` };
 }
+
+// --- Team management (permissions are enforced by Better Auth's organization plugin too)
+
+export async function renameOrganization(_: ActionState, formData: FormData): Promise<ActionState> {
+  const { organization, role } = await requireActiveOrg();
+  if (!canManage(role)) return { error: "Only owners and admins can rename the organization." };
+  const name = text(formData, "name");
+  if (!name) return { error: "Name is required." };
+  await auth.api.updateOrganization({ body: { organizationId: organization.id, data: { name } }, headers: await headers() });
+  revalidatePath("/", "layout");
+  return { ok: "Saved." };
+}
+
+export async function changeMemberRole(memberId: string, formData: FormData) {
+  const { organization, role } = await requireActiveOrg();
+  if (!canManage(role)) return;
+  const newRole = text(formData, "role");
+  if (!["owner", "admin", "member"].includes(newRole)) return;
+  // Only owners can hand out (or take away) ownership.
+  if (newRole === "owner" && role !== "owner") return;
+  await auth.api.updateMemberRole({ body: { memberId, role: newRole, organizationId: organization.id }, headers: await headers() });
+  revalidatePath("/team");
+}
+
+export async function removeMember(memberId: string) {
+  const { organization, role } = await requireActiveOrg();
+  if (!canManage(role)) return;
+  await auth.api.removeMember({ body: { memberIdOrEmail: memberId, organizationId: organization.id }, headers: await headers() });
+  revalidatePath("/team");
+}
+
+export async function leaveOrganization(): Promise<ActionState> {
+  const { organization } = await requireActiveOrg();
+  try {
+    await auth.api.leaveOrganization({ body: { organizationId: organization.id }, headers: await headers() });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Couldn't leave the organization." };
+  }
+  redirect("/dashboard");
+}
+
+export async function deleteOrganization(_: ActionState, formData: FormData): Promise<ActionState> {
+  const { organization, role } = await requireActiveOrg();
+  if (role !== "owner") return { error: "Only owners can delete the organization." };
+  if (text(formData, "confirm") !== organization.name) return { error: `Type "${organization.name}" to confirm.` };
+  const billing = await getBillingState(organization.id);
+  if (billing.status === "active" && billing.plan.id !== "free" && billing.subscription.stripeSubscriptionId && !billing.subscription.cancelAtPeriodEnd) {
+    return { error: "Cancel your paid plan on the Billing page first." };
+  }
+  await auth.api.deleteOrganization({ body: { organizationId: organization.id }, headers: await headers() });
+  redirect("/dashboard");
+}

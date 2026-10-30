@@ -66,10 +66,13 @@ jobs:
       - run: pnpm --filter @clicky/e2e exec playwright-core install --with-deps chromium
       - name: Start servers
         run: |
-          (cd apps/web && pnpm start --port 3000 &) 
+          (cd apps/web && pnpm start --port 3000 > "$GITHUB_WORKSPACE/web.log" 2>&1 &)
           (cd apps/demo && pnpm dev --host 127.0.0.1 &)
           npx wait-on -t 60000 http://localhost:3000 http://localhost:5173
       - run: pnpm --filter @clicky/e2e run all
+        env:
+          # The accounts suite reads emails from the server log (no email provider in CI).
+          WEB_LOG: ${{ github.workspace }}/web.log
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

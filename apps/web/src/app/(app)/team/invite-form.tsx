@@ -10,7 +10,7 @@ export function InviteForm() {
     <form action={action} className="space-y-3">
       <div className="flex flex-wrap gap-3">
         <Input name="email" type="email" required placeholder="teammate@acme.com" className="max-w-xs" />
-        <select name="role" className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+        <select name="role" aria-label="Role" className="rounded-md border border-border bg-card px-3 py-2 text-sm">
           <option value="member">Viewer</option>
           <option value="admin">Admin</option>
         </select>

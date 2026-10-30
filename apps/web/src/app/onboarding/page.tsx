@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listMemberships, requireUser } from "@/lib/dal";
 import { WorkspaceForm } from "./workspace-form";
@@ -12,6 +13,12 @@ export default async function OnboardingPage() {
       <div className="mt-8">
         <WorkspaceForm />
       </div>
+      <p className="mt-6 text-sm text-muted">
+        Waiting for an invitation from your team? Ask them to send it to {session.user.email}. ·{" "}
+        <Link href="/account" className="text-brand-ink underline">
+          Account settings
+        </Link>
+      </p>
     </main>
   );
 }

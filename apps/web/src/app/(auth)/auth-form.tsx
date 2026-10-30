@@ -15,7 +15,8 @@ export function AuthForm({ mode, googleEnabled }: { mode: "sign-in" | "sign-up";
   const router = useRouter();
   const next = safeNext(useSearchParams().get("next"));
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const params = useSearchParams();
+  const [notice, setNotice] = useState<string | null>(params.get("reset") ? "Password changed. Sign in with your new password." : null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(formData: FormData) {
@@ -25,10 +26,12 @@ export function AuthForm({ mode, googleEnabled }: { mode: "sign-in" | "sign-up";
     const password = String(formData.get("password") ?? "");
     const { error } =
       mode === "sign-up"
-        ? await authClient.signUp.email({ name: String(formData.get("name") ?? ""), email, password })
+        ? await authClient.signUp.email({ name: String(formData.get("name") ?? ""), email, password, callbackURL: "/dashboard" })
         : await authClient.signIn.email({ email, password });
     setPending(false);
     if (error) return setError(error.message ?? "Something went wrong.");
+    // With two-step verification on, the client redirects to /two-factor instead.
+    if (window.location.pathname.startsWith("/two-factor")) return;
     router.push(next);
     router.refresh();
   }
@@ -45,7 +48,14 @@ export function AuthForm({ mode, googleEnabled }: { mode: "sign-in" | "sign-up";
   return (
     <div className="space-y-5">
       <h1 className="text-lg font-semibold">{mode === "sign-up" ? "Create your account" : "Sign in"}</h1>
-      <form action={onSubmit} className="space-y-4">
+      {/* onSubmit rather than action: a form action resets the fields, which would wipe the email after a typo'd password. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void onSubmit(new FormData(e.currentTarget));
+        }}
+        className="space-y-4"
+      >
         {mode === "sign-up" && (
           <Field label="Name">
             <Input name="name" required autoComplete="name" />
@@ -64,7 +74,14 @@ export function AuthForm({ mode, googleEnabled }: { mode: "sign-in" | "sign-up";
           />
         </Field>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {notice && <p className="text-sm text-green-600">{notice}</p>}
+        {notice && <p className="text-sm text-green-700">{notice}</p>}
+        {mode === "sign-in" && (
+          <p className="text-right text-sm">
+            <Link href="/forgot-password" className="text-brand-ink">
+              Forgot your password?
+            </Link>
+          </p>
+        )}
         <Button type="submit" disabled={pending} className="w-full">
           {mode === "sign-up" ? "Create account" : "Sign in"}
         </Button>
@@ -91,11 +108,11 @@ export function AuthForm({ mode, googleEnabled }: { mode: "sign-in" | "sign-up";
       <p className="text-center text-sm text-muted">
         {mode === "sign-up" ? (
           <>
-            Already have an account? <Link className="text-brand-ink" href={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link>
+            Already have an account? <Link className="text-brand-ink underline" href={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link>
           </>
         ) : (
           <>
-            New to Clicky? <Link className="text-brand-ink" href={`/sign-up?next=${encodeURIComponent(next)}`}>Create an account</Link>
+            New to Clicky? <Link className="text-brand-ink underline" href={`/sign-up?next=${encodeURIComponent(next)}`}>Create an account</Link>
           </>
         )}
       </p>
