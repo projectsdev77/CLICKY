@@ -152,6 +152,46 @@ await dash.getByRole("button", { name: "Email me this week's summary" }).click()
 await dash.getByText("Sent to demo@clicky.test.").waitFor();
 ok(true, "digest preview sent (logged without an email provider)");
 
+// --- Knowledge from uploaded documents
+function tinyPdf(text) {
+  const stream = `BT /F1 18 Tf 72 720 Td (${text}) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [];
+  objects.forEach((body, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${body}\nendobj\n`; });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf);
+}
+psql("delete from knowledge_source where project_id='seed-project'");
+await dash.goto("http://localhost:3000/projects/seed-project/knowledge");
+await dash.getByLabel("Files to upload").setInputFiles([
+  { name: "refund-policy.pdf", mimeType: "application/pdf", buffer: tinyPdf("Refunds take five business days to reach your card.") },
+  { name: "shortcuts.md", mimeType: "text/markdown", buffer: Buffer.from("# Keyboard shortcuts\n\nPress **G then R** to open Reports.") },
+]);
+await dash.getByRole("button", { name: "Upload", exact: true }).click();
+await dash.getByText("Added 2 files.").waitFor();
+ok(await dash.getByText("File: refund-policy.pdf").isVisible(), "PDF and Markdown uploaded to the knowledge base");
+await dash.getByLabel("Files to upload").setInputFiles([{ name: "notes.docx", mimeType: "application/octet-stream", buffer: Buffer.from("x") }]);
+await dash.getByRole("button", { name: "Upload", exact: true }).click();
+await dash.getByText(/only PDF, Markdown, text and HTML/).waitFor();
+ok(true, "unsupported files are rejected with a clear message");
+await app.goto("http://localhost:5173/reports");
+await w.locator(".launcher").waitFor({ state: "attached" });
+if (!(await w.locator(".panel").isVisible())) await w.locator(".launcher").click();
+await w.locator("input").fill("how long do refunds take?");
+await w.locator("input").press("Enter");
+await idle();
+ok((await w.locator(".msg.assistant").last().textContent()).includes("five business days"), "answers come from the uploaded PDF");
+psql("delete from knowledge_source where project_id='seed-project'");
+
 // --- Widget in another language
 const es = await (await browser.newContext({ locale: "es-ES" })).newPage();
 await es.goto("http://localhost:5173/reports");

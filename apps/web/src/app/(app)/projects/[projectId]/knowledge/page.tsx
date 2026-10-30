@@ -5,7 +5,7 @@ import Link from "next/link";
 import { canManage, requireProject } from "@/lib/dal";
 import { deleteSource, resyncSource } from "@/app/actions";
 import { Card } from "@/components/ui";
-import { AddTextForm, AddUrlForm, RefreshWhileSyncing } from "./knowledge-forms";
+import { AddTextForm, AddUrlForm, RefreshWhileSyncing, UploadForm } from "./knowledge-forms";
 
 const STATUS: Record<string, string> = { pending: "Queued", syncing: "Reading…", ready: "Ready", error: "Failed" };
 
@@ -38,7 +38,7 @@ export default async function KnowledgePage({ params, searchParams }: PageProps<
                 <div className="min-w-0">
                   <p className="truncate font-medium">{s.title}</p>
                   <p className="truncate text-xs text-muted">
-                    {s.type === "url" ? s.url : "Pasted text"} · {STATUS[s.status]}
+                    {s.type === "url" ? s.url : s.type === "file" ? `File: ${s.url}` : "Pasted text"} · {STATUS[s.status]}
                     {s.status === "ready" && s.type === "url" && ` · ${s.pageCount} pages`}
                     {s.lastSyncedAt && ` · updated ${s.lastSyncedAt.toLocaleDateString()}`}
                   </p>
@@ -97,6 +97,9 @@ export default async function KnowledgePage({ params, searchParams }: PageProps<
         <>
           <Card title="Add your help center" description="We'll read up to 30 pages under this address.">
             <AddUrlForm projectId={project.id} />
+          </Card>
+          <Card title="Upload documents" description="PDF, Markdown, text or HTML files, up to 10 MB each (10 at a time).">
+            <UploadForm projectId={project.id} />
           </Card>
           <Card title="Paste an article" description="FAQs, internal how-tos, anything your support team would say.">
             <AddTextForm projectId={project.id} title={typeof prefill === "string" ? prefill : undefined} />

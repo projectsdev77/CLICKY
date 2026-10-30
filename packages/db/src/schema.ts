@@ -116,7 +116,7 @@ export const knowledgeSource = pgTable(
     projectId: text("project_id")
       .notNull()
       .references(() => project.id, { onDelete: "cascade" }),
-    type: text("type").$type<"url" | "text">().notNull(),
+    type: text("type").$type<"url" | "text" | "file">().notNull(),
     title: text("title").notNull(),
     /** Start URL for "url" sources. */
     url: text("url"),

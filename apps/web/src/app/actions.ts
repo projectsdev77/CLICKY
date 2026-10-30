@@ -8,6 +8,7 @@ import { and, eq, knowledgeSource, project } from "@clicky/db";
 import { defaultProjectSettings, generatePublicKey, normalizeOrigin, parseProjectSettings, projectSettingsSchema } from "@clicky/shared";
 import { auth } from "@/lib/auth";
 import { saveTextSource, syncUrlSource } from "@/lib/knowledge";
+import { extractFileText } from "@/lib/knowledge/files";
 import { getBillingState, startTrial } from "@/lib/billing";
 import { deleteEndUserData } from "@/lib/retention";
 import { buildDigest } from "@/lib/digest";
@@ -423,4 +424,28 @@ export async function deleteOrganization(_: ActionState, formData: FormData): Pr
   }
   await auth.api.deleteOrganization({ body: { organizationId: organization.id }, headers: await headers() });
   redirect("/dashboard");
+}
+
+export async function addFileSources(projectId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  await requireProject(projectId, { manage: true });
+  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) return { error: "Choose at least one file." };
+  if (files.length > 10) return { error: "Upload up to 10 files at a time." };
+  const errors: string[] = [];
+  let added = 0;
+  for (const file of files) {
+    const id = crypto.randomUUID();
+    const title = file.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 200) || file.name;
+    try {
+      const text = await extractFileText(file.name, new Uint8Array(await file.arrayBuffer()));
+      await db.insert(knowledgeSource).values({ id, projectId, type: "file", title, url: file.name, status: "syncing" });
+      await saveTextSource(id, projectId, title, text);
+      added++;
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `${file.name} couldn't be read.`);
+    }
+  }
+  revalidatePath(`/projects/${projectId}/knowledge`);
+  if (errors.length) return { error: `${added ? `Added ${added}. ` : ""}${errors.join(" ")}` };
+  return { ok: added === 1 ? "Added 1 file." : `Added ${added} files.` };
 }

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { addTextSource, addUrlSource } from "@/app/actions";
+import { addFileSources, addTextSource, addUrlSource } from "@/app/actions";
 import { Button, Field, FormMessage, Input, Textarea } from "@/components/ui";
 
 export function AddUrlForm({ projectId }: { projectId: string }) {
@@ -47,4 +47,27 @@ export function RefreshWhileSyncing({ active }: { active: boolean }) {
     return () => clearInterval(timer);
   }, [active, router]);
   return null;
+}
+
+export function UploadForm({ projectId }: { projectId: string }) {
+  const [state, action, pending] = useActionState(addFileSources.bind(null, projectId), null);
+  return (
+    <form action={action} className="space-y-3">
+      <input
+        type="file"
+        name="files"
+        multiple
+        required
+        accept=".pdf,.md,.markdown,.txt,.html,.htm"
+        aria-label="Files to upload"
+        className="block text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:py-1.5 file:text-sm"
+      />
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Reading…" : "Upload"}
+        </Button>
+        <FormMessage state={state} />
+      </div>
+    </form>
+  );
 }
